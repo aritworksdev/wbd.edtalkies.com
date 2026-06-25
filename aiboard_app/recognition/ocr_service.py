@@ -30,6 +30,12 @@ class OcrService:
     def google_available(self) -> bool:
         return self._google is not None and self._google.available
 
+    @property
+    def google_availability_reason(self) -> str:
+        if self._google is None:
+            return "GOOGLE_VISION_ENABLED is false"
+        return self._google.availability_reason
+
     def recognize(self, image_bytes: bytes) -> OcrResult:
         attempts: list[str] = []
         errors: list[str] = []
@@ -131,6 +137,7 @@ class OcrService:
         if self._confidence(local_result) >= self.high_confidence:
             return local_result.with_pipeline_details(attempts, errors)
         if not self.google_available or self._google is None:
+            errors.append(f"Google Vision skipped: {self.google_availability_reason}")
             return local_result.with_pipeline_details(attempts, errors)
 
         google_name = self._provider_name(self._google)

@@ -156,12 +156,28 @@ GOOGLE_APPLICATION_CREDENTIALS=./config/google-vision-service-account.json
 GOOGLE_CLOUD_PROJECT_ID=edtalkies
 ```
 
+Relative credential paths such as `./config/google-vision-service-account.json`
+are resolved from the AiBoard project directory, not from the terminal's
+current directory.
+
 When Google Vision is enabled and its credential file is valid, AiBoard calls
 it automatically whenever the best local OCR confidence is below
 `OCR_CONFIDENCE_HIGH` (85% by default). If Google Vision fails, the strongest
 local result remains editable and the cloud error appears in the OCR
 diagnostics. The manual **Use Google Vision OCR** action remains available for
 another attempt on low-confidence image or scanned-PDF results.
+
+If Google is not called, the OCR status now displays the exact reason, such as:
+
+```text
+Google Vision skipped: GOOGLE_VISION_ENABLED is false
+```
+
+or:
+
+```text
+Google Vision skipped: credential file not found: .../config/google-vision-service-account.json
+```
 
 Copy
 `config/google-vision-service-account.example.json.template` to

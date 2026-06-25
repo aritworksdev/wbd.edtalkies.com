@@ -117,6 +117,22 @@ def test_google_failure_preserves_best_local_result() -> None:
     assert any("network unavailable" in error for error in result.errors)
 
 
+def test_unavailable_google_records_skip_reason_below_threshold() -> None:
+    service = OcrService(
+        FakeProvider(_result("paddleocr", 0.40)),
+        FakeProvider(_result("trocr", 0.46)),
+        FakeProvider(_result("tesseract", 0.42)),
+        None,
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize(b"image")
+
+    assert result.provider == "trocr"
+    assert "Google Vision skipped: GOOGLE_VISION_ENABLED is false" in result.errors
+
+
 def test_tesseract_runs_when_primary_local_providers_fail() -> None:
     service = OcrService(
         FakeProvider(error=RuntimeError("paddle unavailable")),
@@ -130,7 +146,9 @@ def test_tesseract_runs_when_primary_local_providers_fail() -> None:
     result = service.recognize(b"image")
 
     assert result.provider == "tesseract"
-    assert len(result.errors) == 2
+    assert "FakeProvider: paddle unavailable" in result.errors
+    assert "FakeProvider: trocr unavailable" in result.errors
+    assert "Google Vision skipped: GOOGLE_VISION_ENABLED is false" in result.errors
 
 
 def test_document_pipeline_prefers_tesseract_before_trocr() -> None:

@@ -17,8 +17,12 @@ class GoogleVisionProvider(OcrProvider):
 
     @property
     def available(self) -> bool:
+        return self.availability_reason == ""
+
+    @property
+    def availability_reason(self) -> str:
         if not self._credentials_path.is_file():
-            return False
+            return f"credential file not found: {self._credentials_path}"
         required = {
             "type",
             "project_id",
@@ -30,21 +34,25 @@ class GoogleVisionProvider(OcrProvider):
             "token_uri",
             "auth_provider_x509_cert_url",
             "client_x509_cert_url",
-            "universe_domain",
         }
         try:
             payload = json.loads(self._credentials_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return False
+        except OSError as exc:
+            return f"credential file cannot be read: {exc}"
+        except ValueError:
+            return "credential file is not valid JSON"
         if not isinstance(payload, dict) or not required.issubset(payload):
-            return False
+            missing = sorted(required.difference(payload if isinstance(payload, dict) else {}))
+            return f"credential JSON is missing fields: {', '.join(missing)}"
         if payload.get("type") != "service_account":
-            return False
-        return not any("REPLACE_" in str(payload.get(key, "")) for key in required)
+            return "credential JSON type must be service_account"
+        if any("REPLACE_" in str(payload.get(key, "")) for key in required):
+            return "credential JSON still contains template placeholders"
+        return ""
 
     def recognize(self, image_bytes: bytes) -> OcrResult:
         if not self.available:
-            raise RuntimeError("Google Vision credentials are missing.")
+            raise RuntimeError(f"Google Vision unavailable: {self.availability_reason}")
         try:
             from google.cloud import vision
         except ImportError as exc:

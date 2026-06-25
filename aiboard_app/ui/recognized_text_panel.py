@@ -133,7 +133,15 @@ class RecognizedTextPanel(QFrame):
         model = result.model_name or result.provider
         confidence = result.confidence or 0.0
         chain = " -> ".join(result.attempts) if result.attempts else model
-        return f"OCR: {model} | Confidence: {confidence:.0%} | Fallbacks: {chain}."
+        cloud = next(
+            (error for error in result.errors if error.startswith("Google Vision skipped:")),
+            "",
+        )
+        cloud_status = f" | {cloud}" if cloud else ""
+        return (
+            f"OCR: {model} | Confidence: {confidence:.0%} | "
+            f"Fallbacks: {chain}{cloud_status}."
+        )
 
     def clear(self) -> None:
         self._set_plain_text("")

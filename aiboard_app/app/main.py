@@ -27,6 +27,13 @@ def main() -> int:
     app.setStyle("Fusion")
     client = EdTalkiesClient(settings.edtalkies)
     recognizer = build_handwriting_recognizer(settings, client)
+    logging.getLogger(__name__).info(
+        "Google Vision enabled=%s available=%s credentials=%s reason=%s",
+        settings.google_vision_enabled,
+        recognizer.google_available,
+        settings.google_application_credentials,
+        recognizer.google_availability_reason or "ready",
+    )
     window = MainWindow(
         settings=settings,
         client=client,

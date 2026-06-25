@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import aiboard_app.app.config as config_module
 from aiboard_app.app.config import load_settings
 
 
@@ -38,3 +41,17 @@ def test_ocr_and_google_settings(monkeypatch, tmp_path) -> None:  # type: ignore
     assert settings.ocr_confidence_medium == 0.7
     assert settings.google_vision_enabled is True
     assert settings.google_application_credentials == credentials
+
+
+def test_relative_google_credentials_resolve_from_project_root(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv(
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "./config/google-vision-service-account.json",
+    )
+
+    settings = load_settings()
+    project_root = Path(config_module.__file__).resolve().parents[2]
+
+    assert settings.google_application_credentials == (
+        project_root / "config/google-vision-service-account.json"
+    ).resolve()

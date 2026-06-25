@@ -83,3 +83,22 @@ def test_status_shows_selected_model_confidence_and_fallback_chain() -> None:
     assert "Tesseract 5 (eng)" in status
     assert "72%" in status
     assert "PaddleOCR PP-OCRv5 (en) -> Tesseract 5 (eng)" in status
+
+
+def test_status_shows_why_google_was_skipped() -> None:
+    _app()
+    panel = RecognizedTextPanel()
+    panel.set_recognition_result(
+        OcrResult(
+            "local result",
+            0.46,
+            "trocr",
+            errors=("Google Vision skipped: credential file not found: C:/missing.json",),
+            model_name="microsoft/trocr-base-handwritten",
+        ),
+        0.85,
+        0.65,
+        google_available=False,
+    )
+
+    assert "Google Vision skipped: credential file not found" in panel._status.text()

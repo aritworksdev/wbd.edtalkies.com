@@ -103,6 +103,15 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             "OCR confidence thresholds must satisfy "
             "0 <= OCR_CONFIDENCE_MEDIUM < OCR_CONFIDENCE_HIGH <= 1."
         )
+    project_root = Path(__file__).resolve().parents[2]
+    credentials_path = Path(
+        os.getenv(
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            "./config/google-vision-service-account.json",
+        )
+    ).expanduser()
+    if not credentials_path.is_absolute():
+        credentials_path = (project_root / credentials_path).resolve()
 
     return AppSettings(
         app_env=os.getenv("AIBOARD_APP_ENV", "production"),
@@ -136,11 +145,6 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
         tesseract_cmd=os.getenv("TESSERACT_CMD", ""),
         tesseract_language=os.getenv("TESSERACT_LANGUAGE", "eng"),
         google_vision_enabled=_bool_env("GOOGLE_VISION_ENABLED", False),
-        google_application_credentials=Path(
-            os.getenv(
-                "GOOGLE_APPLICATION_CREDENTIALS",
-                "./config/google-vision-service-account.json",
-            )
-        ).expanduser(),
+        google_application_credentials=credentials_path,
         google_cloud_project_id=os.getenv("GOOGLE_CLOUD_PROJECT_ID", ""),
     )
