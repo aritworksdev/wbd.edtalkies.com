@@ -19,7 +19,8 @@ def test_extract_plain_text_document(tmp_path: Path) -> None:
     path = tmp_path / "lesson.txt"
     path.write_text("Photosynthesis converts light into chemical energy.", encoding="utf-8")
 
-    result = DocumentTextExtractor(FakeOcrService()).extract(path)
+    extraction = DocumentTextExtractor(FakeOcrService()).extract(path)
+    result = extraction.result
 
     assert "Photosynthesis" in result.text
     assert result.confidence == 1.0
@@ -35,7 +36,7 @@ def test_extract_docx_paragraphs_and_tables(tmp_path: Path) -> None:
     table.cell(0, 1).text = "Meaning"
     document.save(path)
 
-    result = DocumentTextExtractor(FakeOcrService()).extract(path)
+    result = DocumentTextExtractor(FakeOcrService()).extract(path).result
 
     assert "Lesson heading" in result.text
     assert "Term\tMeaning" in result.text
@@ -48,7 +49,7 @@ def test_extract_html_without_script_content(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = DocumentTextExtractor(FakeOcrService()).extract(path)
+    result = DocumentTextExtractor(FakeOcrService()).extract(path).result
 
     assert result.text == "Gravity Gravity attracts masses."
 
@@ -57,10 +58,12 @@ def test_image_document_uses_ocr_service(tmp_path: Path) -> None:
     path = tmp_path / "board.png"
     path.write_bytes(b"image-data")
 
-    result = DocumentTextExtractor(FakeOcrService()).extract(path)
+    extraction = DocumentTextExtractor(FakeOcrService()).extract(path)
+    result = extraction.result
 
     assert result.text == "recognized image text"
     assert result.provider == "fake-ocr"
+    assert extraction.google_vision_images == (b"image-data",)
 
 
 def test_extract_pdf_embedded_text(tmp_path: Path) -> None:
@@ -71,7 +74,25 @@ def test_extract_pdf_embedded_text(tmp_path: Path) -> None:
     document.save(path)
     document.close()
 
-    result = DocumentTextExtractor(FakeOcrService()).extract(path)
+    extraction = DocumentTextExtractor(FakeOcrService()).extract(path)
+    result = extraction.result
 
     assert "Newton described gravity." in result.text
     assert result.provider == "document-pdf"
+    assert extraction.google_vision_images == ()
+
+
+def test_mixed_pdf_preserves_text_and_ocrs_scanned_pages(tmp_path: Path) -> None:
+    path = tmp_path / "mixed.pdf"
+    document = fitz.open()
+    text_page = document.new_page()
+    text_page.insert_text((72, 72), "Digital first page.")
+    document.new_page()
+    document.save(path)
+    document.close()
+
+    extraction = DocumentTextExtractor(FakeOcrService()).extract(path)
+
+    assert "Digital first page." in extraction.result.text
+    assert "recognized image text" in extraction.result.text
+    assert len(extraction.google_vision_images) == 1

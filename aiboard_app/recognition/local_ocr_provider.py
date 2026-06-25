@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from aiboard_app.recognition.ocr_provider_base import OcrProvider, RecognitionResult
+from aiboard_app.recognition.image_preprocessor import dark_text_on_light, decode_grayscale
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,35 +101,32 @@ class LocalOcrProvider(OcrProvider):
                 "Run: pip install -r requirements.txt"
             ) from exc
 
-        encoded = np.frombuffer(image_bytes, dtype=np.uint8)
-        image = cv2.imdecode(encoded, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            raise ValueError("The whiteboard image could not be decoded.")
+        paper = dark_text_on_light(decode_grayscale(image_bytes))
 
-        # Board strokes are light on black. Threshold them, then use a small
-        # horizontal closing operation so letters on the same line group well.
-        _, ink = cv2.threshold(image, 35, 255, cv2.THRESH_BINARY)
-        if cv2.countNonZero(ink) < 20:
+        # Normalize to white ink on black for line detection, regardless of
+        # whether the source was a blackboard or a normal white document.
+        _, dark_text = cv2.threshold(paper, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        if cv2.countNonZero(dark_text) < 20:
             return []
 
         horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 3))
-        grouped = cv2.morphologyEx(ink, cv2.MORPH_CLOSE, horizontal_kernel)
+        grouped = cv2.morphologyEx(dark_text, cv2.MORPH_CLOSE, horizontal_kernel)
         active_rows = cv2.reduce(grouped, 1, cv2.REDUCE_MAX).reshape(-1) > 0
         row_ranges = LocalOcrProvider._contiguous_ranges(active_rows.tolist(), minimum_size=4)
 
         lines: list[Any] = []
-        height, width = ink.shape
+        height, width = dark_text.shape
         for top, bottom in row_ranges:
             top = max(0, top - 12)
             bottom = min(height, bottom + 12)
-            band = ink[top:bottom, :]
+            band = dark_text[top:bottom, :]
             active_columns = cv2.reduce(band, 0, cv2.REDUCE_MAX).reshape(-1) > 0
             column_ranges = LocalOcrProvider._contiguous_ranges(active_columns.tolist(), minimum_size=2)
             if not column_ranges:
                 continue
             left = max(0, column_ranges[0][0] - 12)
             right = min(width, column_ranges[-1][1] + 12)
-            crop = ink[top:bottom, left:right]
+            crop = dark_text[top:bottom, left:right]
 
             # TrOCR expects dark handwriting on a light page.
             paper = cv2.bitwise_not(crop)

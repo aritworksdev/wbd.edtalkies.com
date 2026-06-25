@@ -23,6 +23,7 @@ from aiboard_app.ai.prompt_builder import PromptBuilder
 from aiboard_app.ai.response_parser import ResponseParser
 from aiboard_app.app.config import AppSettings
 from aiboard_app.documents.document_manager import DocumentManager
+from aiboard_app.documents.document_text_extractor import DocumentExtraction
 from aiboard_app.recognition.handwriting_recognizer import HandwritingRecognizer
 from aiboard_app.recognition.ocr_result import OcrResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
@@ -83,7 +84,7 @@ class MainWindow(QMainWindow):
         self._busy_count = 0
         self._recognized_revision: int | None = None
         self._recognition_in_progress = False
-        self._google_ocr_source: bytes | None = None
+        self._google_ocr_sources: tuple[bytes, ...] = ()
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -148,7 +149,7 @@ class MainWindow(QMainWindow):
             return
         revision = self._canvas.revision
         image_bytes = self._canvas.to_png_bytes()
-        self._google_ocr_source = image_bytes
+        self._google_ocr_sources = (image_bytes,)
         self._recognition_in_progress = True
         self._run_background(
             "Converting handwriting to text...",
@@ -195,7 +196,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == RecognitionConfirmDialog.DialogCode.Accepted:
             self._recognized_text_panel.set_text(dialog.text(), "keyboard")
             self._recognized_revision = self._canvas.revision
-            self._google_ocr_source = None
+            self._google_ocr_sources = ()
 
     def _upload_document(self) -> None:
         file_name, _ = QFileDialog.getOpenFileName(
@@ -219,20 +220,21 @@ class MainWindow(QMainWindow):
             "Document extraction failed",
         )
 
-    def _extract_document_payload(self, path: Path) -> tuple[OcrResult, Path, bytes | None]:
-        result = self._document_manager.extract_text(path)
-        image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
-        google_source = path.read_bytes() if path.suffix.lower() in image_extensions else None
-        return result, path, google_source
+    def _extract_document_payload(self, path: Path) -> tuple[DocumentExtraction, Path]:
+        return self._document_manager.extract_text(path), path
 
     def _display_document_text(self, payload: object) -> None:
-        if not isinstance(payload, tuple) or len(payload) != 3:
+        if not isinstance(payload, tuple) or len(payload) != 2:
             QMessageBox.warning(self, "Extraction error", "The document extractor returned invalid data.")
             return
-        result, path, google_source = payload
+        extraction, path = payload
         if not isinstance(path, Path):
             QMessageBox.warning(self, "Extraction error", "The selected document path is invalid.")
             return
+        if not isinstance(extraction, DocumentExtraction):
+            QMessageBox.warning(self, "Extraction error", "The document extraction result is invalid.")
+            return
+        result = extraction.result
         if not isinstance(result, OcrResult) or not result.text.strip():
             QMessageBox.warning(
                 self,
@@ -240,12 +242,12 @@ class MainWindow(QMainWindow):
                 f"No readable text could be extracted from {path.name}.",
             )
             return
-        self._google_ocr_source = google_source if isinstance(google_source, bytes) else None
+        self._google_ocr_sources = extraction.google_vision_images
         self._recognized_text_panel.set_recognition_result(
             result,
             self._recognizer.high_confidence,
             self._recognizer.medium_confidence,
-            self._recognizer.google_available and self._google_ocr_source is not None,
+            self._recognizer.google_available and bool(self._google_ocr_sources),
         )
         self._recognized_text_panel.set_status(
             f"Extracted from {path.name} using {result.provider}. Review before sending."
@@ -277,13 +279,13 @@ class MainWindow(QMainWindow):
         self._submit_question(self._recognized_text_panel.text())
 
     def _recognize_with_google(self) -> None:
-        if not self._recognizer.google_available or self._google_ocr_source is None:
+        if not self._recognizer.google_available or not self._google_ocr_sources:
             return
         revision = self._canvas.revision
-        image_bytes = self._google_ocr_source
+        images = self._google_ocr_sources
         self._run_background(
             "Using Google Vision OCR...",
-            lambda: self._recognizer.recognize_with_google(image_bytes),
+            lambda: self._recognizer.recognize_many_with_google(images),
             lambda result: self._display_recognized_text(result, revision),
             "Google Vision OCR failed",
         )
@@ -291,7 +293,7 @@ class MainWindow(QMainWindow):
     def _clear_board(self) -> None:
         self._canvas.clear()
         self._recognized_revision = None
-        self._google_ocr_source = None
+        self._google_ocr_sources = ()
         self._recognized_text_panel.clear()
 
     def _submit_question(self, text: str) -> None:

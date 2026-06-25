@@ -108,3 +108,30 @@ def test_google_is_available_with_service_account_shape(tmp_path: Path) -> None:
     )
 
     assert GoogleVisionProvider(credentials, "edtalkies").available is True
+
+
+def test_multiple_google_pages_are_combined() -> None:
+    class FakeGoogle:
+        available = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def recognize(self, image_bytes: bytes) -> OcrResult:
+            self.calls += 1
+            return _result("google-vision", 0.9, image_bytes.decode())
+
+    google = FakeGoogle()
+    service = OcrService(
+        FakeProvider(_result("paddleocr", 0.9)),
+        FakeProvider(),
+        FakeProvider(),
+        google,  # type: ignore[arg-type]
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize_many_with_google((b"page one", b"page two"))
+
+    assert result.text == "page one\n\npage two"
+    assert google.calls == 2

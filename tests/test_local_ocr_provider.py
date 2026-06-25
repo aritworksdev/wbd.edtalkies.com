@@ -5,6 +5,8 @@ import io
 from PIL import Image, ImageDraw
 
 from aiboard_app.recognition.local_ocr_provider import LocalOcrProvider
+from aiboard_app.recognition.trocr_provider import TrOcrProvider
+from aiboard_app.recognition.ocr_result import OcrResult
 
 
 def _blackboard_image() -> bytes:
@@ -32,3 +34,16 @@ def test_contiguous_ranges_filters_small_noise() -> None:
         minimum_size=2,
     )
     assert ranges == [(4, 7)]
+
+
+def test_trocr_confidence_is_calibrated_for_review(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        LocalOcrProvider,
+        "recognize",
+        lambda self, image: OcrResult("possibly wrong", 0.99, "local-trocr"),
+    )
+
+    result = TrOcrProvider().recognize(b"image")
+
+    assert result.confidence == 0.84
+    assert result.provider == "trocr"

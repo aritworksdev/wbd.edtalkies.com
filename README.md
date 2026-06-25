@@ -81,6 +81,10 @@ Large scanned PDFs can take time because every page must be rendered and
 recognized. The board remains responsive and displays extraction status while
 the work continues.
 
+AiBoard automatically detects whether an uploaded image is a normal
+black-text-on-white document or a light-on-dark board image before OCR.
+Mixed PDFs preserve embedded text and OCR only scanned pages.
+
 ## Configure EdTalkies
 
 Edit `.env`:
@@ -129,7 +133,8 @@ GOOGLE_CLOUD_PROJECT_ID=edtalkies
 ```
 
 Google Vision is never called automatically. The option is shown only for
-low-confidence results when it is enabled and the credential file exists.
+low/uncertain-confidence image or scanned-PDF results when it is enabled and
+the credential file exists. Select **Use Google Vision OCR** to invoke it.
 
 Copy
 `config/google-vision-service-account.example.json.template` to

@@ -5,8 +5,7 @@ from urllib.parse import unquote, urlparse
 
 from aiboard_app.documents.file_downloader import FileDownloader
 from aiboard_app.documents.file_opener import FileOpener
-from aiboard_app.documents.document_text_extractor import DocumentTextExtractor
-from aiboard_app.recognition.ocr_result import OcrResult
+from aiboard_app.documents.document_text_extractor import DocumentExtraction, DocumentTextExtractor
 from aiboard_app.recognition.ocr_service import OcrService
 
 
@@ -42,7 +41,7 @@ class DocumentManager:
             self._timeout_seconds,
         )
 
-    def extract_text(self, path: Path) -> OcrResult:
+    def extract_text(self, path: Path) -> DocumentExtraction:
         if self._extractor is None:
             raise RuntimeError("Document OCR service is not configured.")
         return self._extractor.extract(path)

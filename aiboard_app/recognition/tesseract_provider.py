@@ -5,6 +5,7 @@ from pathlib import Path
 
 from aiboard_app.recognition.ocr_provider_base import OcrProvider
 from aiboard_app.recognition.ocr_result import OcrResult, OcrWord
+from aiboard_app.recognition.image_preprocessor import dark_text_on_light, decode_grayscale
 
 
 class TesseractProvider(OcrProvider):
@@ -17,14 +18,15 @@ class TesseractProvider(OcrProvider):
     def recognize(self, image_bytes: bytes) -> OcrResult:
         try:
             import pytesseract
-            from PIL import Image, ImageOps
+            from PIL import Image
             from pytesseract import Output
         except ImportError as exc:
             raise RuntimeError("pytesseract and Pillow are required for Tesseract OCR.") from exc
 
         if self._command:
             pytesseract.pytesseract.tesseract_cmd = str(Path(self._command).expanduser())
-        image = ImageOps.invert(Image.open(io.BytesIO(image_bytes)).convert("L"))
+        normalized = dark_text_on_light(decode_grayscale(image_bytes))
+        image = Image.fromarray(normalized)
         try:
             data = pytesseract.image_to_data(
                 image,

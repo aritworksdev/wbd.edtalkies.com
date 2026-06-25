@@ -62,6 +62,23 @@ class OcrService:
         result = self._google.recognize(image_bytes)
         return result.with_pipeline_details(["google-vision"], [])
 
+    def recognize_many_with_google(self, images: tuple[bytes, ...]) -> OcrResult:
+        if not images:
+            raise RuntimeError("No document images are available for Google Vision OCR.")
+        results = [self.recognize_with_google(image) for image in images]
+        populated = [result for result in results if result.text.strip()]
+        if not populated:
+            return OcrResult.empty("google-vision")
+        confidences = [result.confidence for result in populated if result.confidence is not None]
+        confidence = sum(confidences) / len(confidences) if confidences else None
+        return OcrResult(
+            text="\n\n".join(result.text for result in populated),
+            confidence=confidence,
+            provider="google-vision",
+            words=tuple(word for result in populated for word in result.words),
+            attempts=("google-vision",),
+        )
+
     @staticmethod
     def _confidence(result: OcrResult) -> float:
         return result.confidence or 0.0

@@ -5,6 +5,7 @@ from typing import Any
 
 from aiboard_app.recognition.ocr_provider_base import OcrProvider
 from aiboard_app.recognition.ocr_result import OcrResult, OcrWord
+from aiboard_app.recognition.image_preprocessor import normalized_color_image
 
 
 class PaddleOcrProvider(OcrProvider):
@@ -18,16 +19,12 @@ class PaddleOcrProvider(OcrProvider):
         if not image_bytes:
             return OcrResult.empty("paddleocr")
         try:
-            import cv2
-            import numpy as np
+            import cv2  # noqa: F401
         except ImportError as exc:
             raise RuntimeError("PaddleOCR image dependencies are not installed.") from exc
 
         self._load_engine()
-        image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
-        if image is None:
-            raise ValueError("The whiteboard image could not be decoded.")
-        image = cv2.bitwise_not(image)
+        image = normalized_color_image(image_bytes)
 
         if hasattr(self._engine, "predict"):
             raw = list(self._engine.predict(input=image))

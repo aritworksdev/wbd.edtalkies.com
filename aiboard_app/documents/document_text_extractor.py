@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import html
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from aiboard_app.recognition.ocr_result import OcrResult, OcrWord
 from aiboard_app.recognition.ocr_service import OcrService
+
+
+@dataclass(frozen=True)
+class DocumentExtraction:
+    result: OcrResult
+    google_vision_images: tuple[bytes, ...] = ()
 
 
 class DocumentTextExtractor:
@@ -28,7 +35,7 @@ class DocumentTextExtractor:
     def __init__(self, ocr_service: OcrService) -> None:
         self._ocr_service = ocr_service
 
-    def extract(self, path: Path) -> OcrResult:
+    def extract(self, path: Path) -> DocumentExtraction:
         if not path.is_file():
             raise FileNotFoundError(path)
         extension = path.suffix.lower()
@@ -38,38 +45,52 @@ class DocumentTextExtractor:
         if extension == ".pdf":
             return self._extract_pdf(path)
         if extension == ".docx":
-            return self._extract_docx(path)
+            return DocumentExtraction(self._extract_docx(path))
         if extension in {".html", ".htm"}:
-            return self._extract_html(path)
+            return DocumentExtraction(self._extract_html(path))
         if extension in {".txt", ".md", ".markdown"}:
-            return self._direct_result(path.read_text(encoding="utf-8-sig"), f"document-{extension[1:]}")
-        return self._ocr_service.recognize(path.read_bytes())
+            return DocumentExtraction(
+                self._direct_result(
+                    path.read_text(encoding="utf-8-sig"),
+                    f"document-{extension[1:]}",
+                )
+            )
+        image_bytes = path.read_bytes()
+        return DocumentExtraction(
+            self._ocr_service.recognize(image_bytes),
+            (image_bytes,),
+        )
 
-    def _extract_pdf(self, path: Path) -> OcrResult:
+    def _extract_pdf(self, path: Path) -> DocumentExtraction:
         try:
             from pypdf import PdfReader
         except ImportError as exc:
             raise RuntimeError("PDF extraction requires pypdf.") from exc
 
         reader = PdfReader(str(path))
-        pages = [(page.extract_text() or "").strip() for page in reader.pages]
-        text = "\n\n".join(page for page in pages if page).strip()
-        if text:
-            return self._direct_result(text, "document-pdf")
+        embedded_pages = [(page.extract_text() or "").strip() for page in reader.pages]
 
-        # Scanned PDFs have no embedded text. Render each page and use the
-        # configured OCR pipeline.
+        # Mixed PDFs can contain both digital-text and scanned pages. Preserve
+        # embedded text and OCR only the pages that do not contain usable text.
         try:
             import fitz
         except ImportError as exc:
             raise RuntimeError("Scanned PDF OCR requires PyMuPDF.") from exc
 
         results: list[OcrResult] = []
+        page_images: list[bytes] = []
         with fitz.open(path) as document:
-            for page in document:
-                pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-                results.append(self._ocr_service.recognize(pixmap.tobytes("png")))
-        return self._combine_ocr_results(results, "document-pdf-ocr")
+            for index, page in enumerate(document):
+                embedded = embedded_pages[index] if index < len(embedded_pages) else ""
+                if embedded:
+                    results.append(self._direct_result(embedded, "document-pdf"))
+                    continue
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False)
+                image_bytes = pixmap.tobytes("png")
+                page_images.append(image_bytes)
+                results.append(self._ocr_service.recognize(image_bytes))
+        provider = "document-pdf" if not page_images else "document-pdf-mixed-ocr"
+        return DocumentExtraction(self._combine_ocr_results(results, provider), tuple(page_images))
 
     @staticmethod
     def _extract_docx(path: Path) -> OcrResult:
