@@ -47,6 +47,8 @@ Real local handwriting recognition is enabled by default:
 ```env
 AIBOARD_HANDWRITING_PROVIDER=local
 AIBOARD_LOCAL_HANDWRITING_MODEL=microsoft/trocr-base-handwritten
+AIBOARD_AUTO_RECOGNIZE=true
+AIBOARD_AUTO_RECOGNIZE_DELAY_MS=1800
 ```
 
 The local provider uses Microsoft's TrOCR handwritten model. On first use it
@@ -69,12 +71,18 @@ EDTALKIES_OCR_PATH=/api/ocr/handwriting
 Use `edtalkies` to send the board image to the configured EdTalkies OCR
 endpoint. Use `mock` only for UI testing; it does not read handwriting.
 
+Old `.env` files may still contain `AIBOARD_HANDWRITING_PROVIDER=mock`.
+AiBoard now migrates that value to local OCR unless
+`AIBOARD_ALLOW_MOCK_RECOGNIZER=true` is explicitly configured.
+
 ## Current Features
 
 - Full-screen touch-friendly whiteboard with mouse and stylus support
 - Pen color and thickness, eraser, clear, undo, redo, and PNG save
 - A separate **Handwriting to Text** action that displays recognized text in
   an editable panel before **Ask AI** can submit it
+- Automatic conversion after mouse or stylus writing pauses, with recognized
+  text placed directly in the editable text box
 - Real local handwriting OCR with blackboard preprocessing and multiline
   recognition using TrOCR
 - Keyboard question entry using the same visible review/API flow
@@ -82,7 +90,7 @@ endpoint. Use `mock` only for UI testing; it does not read handwriting.
 - Configurable EdTalkies API client with timeout, retries, IDs, and mock mode
 - Rich text/HTML response panel with scrolling, copy, save, and document actions
 - Safe Windows quit, shutdown, and restart behavior with confirmation
-- Placeholder voice, camera, gesture, and local OCR providers
+- Placeholder voice, camera, and gesture providers
 - File and console logging under the configured export directory
 
 ## API Contract Integration Points

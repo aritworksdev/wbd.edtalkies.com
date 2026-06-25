@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, Qt
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPen, QTabletEvent
 from PySide6.QtWidgets import QWidget
 
 
 class WhiteboardCanvas(QWidget):
+    content_changed = Signal(int)
     BOARD_COLOR = QColor("#000000")
 
     def __init__(self) -> None:
@@ -22,6 +23,11 @@ class WhiteboardCanvas(QWidget):
         self._image.fill(self.BOARD_COLOR)
         self._undo_stack: list[QImage] = []
         self._redo_stack: list[QImage] = []
+        self._revision = 0
+
+    @property
+    def revision(self) -> int:
+        return self._revision
 
     def set_pen_color(self, color: QColor) -> None:
         self._pen_color = color
@@ -37,6 +43,7 @@ class WhiteboardCanvas(QWidget):
         self._save_undo_state()
         self._image.fill(self.BOARD_COLOR)
         self.update()
+        self._notify_content_changed()
 
     def undo(self) -> None:
         if not self._undo_stack:
@@ -44,6 +51,7 @@ class WhiteboardCanvas(QWidget):
         self._redo_stack.append(self._image.copy())
         self._image = self._undo_stack.pop()
         self.update()
+        self._notify_content_changed()
 
     def redo(self) -> None:
         if not self._redo_stack:
@@ -51,6 +59,7 @@ class WhiteboardCanvas(QWidget):
         self._undo_stack.append(self._image.copy())
         self._image = self._redo_stack.pop()
         self.update()
+        self._notify_content_changed()
 
     def save_image(self, path: str) -> bool:
         return self._image.save(path)
@@ -93,6 +102,7 @@ class WhiteboardCanvas(QWidget):
         if event.button() == Qt.MouseButton.LeftButton and self._drawing:
             self._draw_line_to(event.position().toPoint())
             self._drawing = False
+            self._notify_content_changed()
 
     def tabletEvent(self, event: QTabletEvent) -> None:
         point = event.position().toPoint()
@@ -107,6 +117,7 @@ class WhiteboardCanvas(QWidget):
         elif event.type() == event.Type.TabletRelease and self._drawing:
             self._draw_line_to(point)
             self._drawing = False
+            self._notify_content_changed()
             event.accept()
         else:
             super().tabletEvent(event)
@@ -140,3 +151,7 @@ class WhiteboardCanvas(QWidget):
         self._redo_stack.clear()
         if len(self._undo_stack) > 20:
             self._undo_stack.pop(0)
+
+    def _notify_content_changed(self) -> None:
+        self._revision += 1
+        self.content_changed.emit(self._revision)

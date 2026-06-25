@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -79,6 +79,12 @@ class MainWindow(QMainWindow):
         self._thread_pool = QThreadPool.globalInstance()
         self._progress: QProgressDialog | None = None
         self._active_workers: set[BackgroundWorker] = set()
+        self._auto_recognition_in_progress = False
+        self._auto_recognition_pending = False
+        self._auto_recognition_timer = QTimer(self)
+        self._auto_recognition_timer.setSingleShot(True)
+        self._auto_recognition_timer.setInterval(max(500, settings.auto_recognize_delay_ms))
+        self._auto_recognition_timer.timeout.connect(self._start_auto_recognition)
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -135,8 +141,57 @@ class MainWindow(QMainWindow):
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
         self._recognized_text_panel.ask_requested.connect(self._ask_ai)
+        self._canvas.content_changed.connect(self._schedule_auto_recognition)
+
+    def _schedule_auto_recognition(self, revision: int) -> None:
+        if not self._settings.auto_recognize:
+            return
+        if self._auto_recognition_in_progress:
+            self._auto_recognition_pending = True
+            return
+        self._recognized_text_panel.set_status("Waiting for writing to pause...")
+        self._auto_recognition_timer.start()
+
+    def _start_auto_recognition(self) -> None:
+        if self._auto_recognition_in_progress:
+            self._auto_recognition_pending = True
+            return
+        revision = self._canvas.revision
+        image_bytes = self._canvas.to_png_bytes()
+        self._auto_recognition_in_progress = True
+        self._auto_recognition_pending = False
+        self._recognized_text_panel.set_status("Recognizing handwriting...")
+        self._run_background(
+            "",
+            lambda: self._recognizer.recognize(image_bytes),
+            lambda result: self._display_auto_recognition(result, revision),
+            "Recognition failed",
+            show_progress=False,
+            on_complete=self._complete_auto_recognition,
+        )
+
+    def _display_auto_recognition(self, result: object, revision: int) -> None:
+        if revision != self._canvas.revision:
+            self._auto_recognition_pending = True
+            return
+        if not isinstance(result, RecognitionResult):
+            self._recognized_text_panel.set_status("Recognition returned an invalid result.")
+            return
+        if result.text.strip():
+            self._recognized_text_panel.set_recognition_result(result)
+        else:
+            self._recognized_text_panel.set_status(
+                "No readable handwriting found. Write larger with clear spacing."
+            )
+
+    def _complete_auto_recognition(self) -> None:
+        self._auto_recognition_in_progress = False
+        if self._auto_recognition_pending:
+            self._auto_recognition_pending = False
+            self._auto_recognition_timer.start()
 
     def _recognize_handwriting(self) -> None:
+        self._auto_recognition_timer.stop()
         image_bytes = self._canvas.to_png_bytes()
         self._run_background(
             "Converting handwriting to text...",
@@ -172,7 +227,9 @@ class MainWindow(QMainWindow):
         self._submit_question(self._recognized_text_panel.text())
 
     def _clear_board(self) -> None:
+        self._auto_recognition_timer.stop()
         self._canvas.clear()
+        self._auto_recognition_timer.stop()
         self._recognized_text_panel.clear()
 
     def _submit_question(self, text: str) -> None:
@@ -243,36 +300,59 @@ class MainWindow(QMainWindow):
         task: Callable[[], Any],
         on_success: Callable[[object], None],
         error_title: str,
+        show_progress: bool = True,
+        on_complete: Callable[[], None] | None = None,
     ) -> None:
-        progress = QProgressDialog(message, "", 0, 0, self)
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setCancelButton(None)
-        progress.setMinimumDuration(0)
-        progress.show()
-        self._progress = progress
+        progress: QProgressDialog | None = None
+        if show_progress:
+            progress = QProgressDialog(message, "", 0, 0, self)
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setCancelButton(None)
+            progress.setMinimumDuration(0)
+            progress.show()
+            self._progress = progress
 
         worker = BackgroundWorker(task)
         worker.signals.succeeded.connect(lambda result: self._finish_background(progress, on_success, result))
-        worker.signals.failed.connect(lambda error: self._fail_background(progress, error_title, error))
-        worker.signals.finished.connect(lambda: self._release_worker(worker))
+        worker.signals.failed.connect(
+            lambda error: self._fail_background(progress, error_title, error, show_progress)
+        )
+        worker.signals.finished.connect(lambda: self._release_worker(worker, on_complete))
         self._active_workers.add(worker)
         self._thread_pool.start(worker)
 
-    def _release_worker(self, worker: BackgroundWorker) -> None:
+    def _release_worker(
+        self,
+        worker: BackgroundWorker,
+        on_complete: Callable[[], None] | None = None,
+    ) -> None:
         self._active_workers.discard(worker)
+        if on_complete is not None:
+            on_complete()
 
     def _finish_background(
         self,
-        progress: QProgressDialog,
+        progress: QProgressDialog | None,
         callback: Callable[[object], None],
         result: object,
     ) -> None:
-        progress.close()
+        if progress is not None:
+            progress.close()
         callback(result)
 
-    def _fail_background(self, progress: QProgressDialog, title: str, error: str) -> None:
-        progress.close()
-        QMessageBox.critical(self, title, error)
+    def _fail_background(
+        self,
+        progress: QProgressDialog | None,
+        title: str,
+        error: str,
+        show_dialog: bool = True,
+    ) -> None:
+        if progress is not None:
+            progress.close()
+        if show_dialog:
+            QMessageBox.critical(self, title, error)
+        else:
+            self._recognized_text_panel.set_status(f"{title}: {error}")
 
     def _exit(self) -> None:
         self._shutdown_manager.perform_exit(self)

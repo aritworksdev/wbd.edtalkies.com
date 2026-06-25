@@ -64,6 +64,8 @@ class AppSettings:
     log_level: str
     edtalkies: EdTalkiesSettings
     local_handwriting_model: str = "microsoft/trocr-base-handwritten"
+    auto_recognize: bool = True
+    auto_recognize_delay_ms: int = 1800
 
 
 def load_settings(env_file: str | Path | None = None) -> AppSettings:
@@ -73,12 +75,17 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
         load_dotenv()
 
     export_dir = Path(os.getenv("AIBOARD_EXPORT_DIR", "~/AiBoard/exports")).expanduser()
+    provider = os.getenv("AIBOARD_HANDWRITING_PROVIDER", "local").lower()
+    # Early releases generated .env files with mock enabled. Silently migrate
+    # those installations to real OCR unless mock mode is explicitly allowed.
+    if provider == "mock" and not _bool_env("AIBOARD_ALLOW_MOCK_RECOGNIZER", False):
+        provider = "local"
 
     return AppSettings(
         app_env=os.getenv("AIBOARD_APP_ENV", "production"),
         fullscreen=_bool_env("AIBOARD_FULLSCREEN", True),
         export_dir=export_dir,
-        handwriting_provider=os.getenv("AIBOARD_HANDWRITING_PROVIDER", "local").lower(),
+        handwriting_provider=provider,
         exit_action=os.getenv("AIBOARD_EXIT_ACTION", "quit").lower(),
         confirm_exit=_bool_env("AIBOARD_CONFIRM_EXIT", True),
         log_level=os.getenv("AIBOARD_LOG_LEVEL", "INFO").upper(),
@@ -100,4 +107,6 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             "AIBOARD_LOCAL_HANDWRITING_MODEL",
             "microsoft/trocr-base-handwritten",
         ),
+        auto_recognize=_bool_env("AIBOARD_AUTO_RECOGNIZE", True),
+        auto_recognize_delay_ms=_int_env("AIBOARD_AUTO_RECOGNIZE_DELAY_MS", 1800),
     )
