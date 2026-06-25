@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - convenience before dependencies are installed.
+    def load_dotenv(*args, **kwargs) -> bool:  # type: ignore[no-redef]
+        return False
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _int_env(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {value!r}.") from exc
+
+
+@dataclass(frozen=True)
+class EdTalkiesSettings:
+    api_base_url: str
+    api_key: str
+    ai_query_path: str
+    ocr_path: str
+    timeout_seconds: int
+    retry_count: int
+    model: str
+    assistant_mode: str
+    school_id: str
+    board_id: str
+    device_id: str
+    session_id: str = ""
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_base_url.strip())
+
+    def build_url(self, path: str) -> str:
+        base = self.api_base_url.rstrip("/")
+        route = path if path.startswith("/") else f"/{path}"
+        return f"{base}{route}"
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    app_env: str
+    fullscreen: bool
+    export_dir: Path
+    handwriting_provider: str
+    exit_action: str
+    confirm_exit: bool
+    log_level: str
+    edtalkies: EdTalkiesSettings
+
+
+def load_settings(env_file: str | Path | None = None) -> AppSettings:
+    if env_file:
+        load_dotenv(env_file)
+    else:
+        load_dotenv()
+
+    export_dir = Path(os.getenv("AIBOARD_EXPORT_DIR", "~/AiBoard/exports")).expanduser()
+
+    return AppSettings(
+        app_env=os.getenv("AIBOARD_APP_ENV", "production"),
+        fullscreen=_bool_env("AIBOARD_FULLSCREEN", True),
+        export_dir=export_dir,
+        handwriting_provider=os.getenv("AIBOARD_HANDWRITING_PROVIDER", "mock").lower(),
+        exit_action=os.getenv("AIBOARD_EXIT_ACTION", "quit").lower(),
+        confirm_exit=_bool_env("AIBOARD_CONFIRM_EXIT", True),
+        log_level=os.getenv("AIBOARD_LOG_LEVEL", "INFO").upper(),
+        edtalkies=EdTalkiesSettings(
+            api_base_url=os.getenv("EDTALKIES_API_BASE_URL", ""),
+            api_key=os.getenv("EDTALKIES_API_KEY", ""),
+            ai_query_path=os.getenv("EDTALKIES_AI_QUERY_PATH", "/api/ai/query"),
+            ocr_path=os.getenv("EDTALKIES_OCR_PATH", "/api/ocr/handwriting"),
+            timeout_seconds=_int_env("EDTALKIES_TIMEOUT_SECONDS", 30),
+            retry_count=_int_env("EDTALKIES_RETRY_COUNT", 2),
+            model=os.getenv("EDTALKIES_MODEL", "default"),
+            assistant_mode=os.getenv("EDTALKIES_ASSISTANT_MODE", "teacher_board"),
+            school_id=os.getenv("EDTALKIES_SCHOOL_ID", ""),
+            board_id=os.getenv("EDTALKIES_BOARD_ID", ""),
+            device_id=os.getenv("EDTALKIES_DEVICE_ID", ""),
+            session_id=os.getenv("EDTALKIES_SESSION_ID", ""),
+        ),
+    )
