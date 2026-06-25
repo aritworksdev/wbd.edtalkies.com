@@ -26,6 +26,7 @@ from aiboard_app.recognition.handwriting_recognizer import HandwritingRecognizer
 from aiboard_app.recognition.ocr_provider_base import RecognitionResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
+from aiboard_app.ui.recognized_text_panel import RecognizedTextPanel
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.toolbar import WhiteboardToolbar
 from aiboard_app.ui.whiteboard_canvas import WhiteboardCanvas
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
         self._canvas = WhiteboardCanvas()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
+        self._recognized_text_panel = RecognizedTextPanel()
         self._footer = self._build_footer()
 
         body = QHBoxLayout()
@@ -103,6 +105,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self._header)
         root_layout.addWidget(self._toolbar)
         root_layout.addLayout(body, 1)
+        root_layout.addWidget(self._recognized_text_panel)
         root_layout.addWidget(self._footer)
         self.setCentralWidget(root)
 
@@ -120,34 +123,40 @@ class MainWindow(QMainWindow):
         self._toolbar.color_changed.connect(self._canvas.set_pen_color)
         self._toolbar.width_changed.connect(self._canvas.set_pen_width)
         self._toolbar.eraser_toggled.connect(self._canvas.set_eraser)
-        self._toolbar.clear_requested.connect(self._canvas.clear)
+        self._toolbar.clear_requested.connect(self._clear_board)
         self._toolbar.undo_requested.connect(self._canvas.undo)
         self._toolbar.redo_requested.connect(self._canvas.redo)
-        self._toolbar.recognize_requested.connect(self._recognize_and_ask)
+        self._toolbar.recognize_requested.connect(self._recognize_handwriting)
+        self._toolbar.ask_requested.connect(self._ask_ai)
         self._toolbar.keyboard_requested.connect(self._keyboard_question)
         self._toolbar.save_requested.connect(self._save_board_image)
         self._toolbar.exit_requested.connect(self._exit)
         self._response_panel.close_requested.connect(self._response_panel.hide)
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
+        self._recognized_text_panel.ask_requested.connect(self._ask_ai)
 
-    def _recognize_and_ask(self) -> None:
+    def _recognize_handwriting(self) -> None:
         image_bytes = self._canvas.to_png_bytes()
         self._run_background(
-            "Recognizing handwriting…",
+            "Converting handwriting to text...",
             lambda: self._recognizer.recognize(image_bytes),
-            self._confirm_recognized_text,
+            self._display_recognized_text,
             "Recognition failed",
         )
 
-    def _confirm_recognized_text(self, result: object) -> None:
+    def _display_recognized_text(self, result: object) -> None:
         if not isinstance(result, RecognitionResult):
             QMessageBox.critical(self, "Recognition failed", "The recognizer returned an invalid result.")
             return
-        dialog = RecognitionConfirmDialog(result.text, self)
-        if dialog.exec() != RecognitionConfirmDialog.DialogCode.Accepted:
+        if not result.text.strip():
+            QMessageBox.information(
+                self,
+                "No handwriting recognized",
+                "No readable text was found. Try writing larger and run Handwriting to Text again.",
+            )
             return
-        self._submit_question(dialog.text())
+        self._recognized_text_panel.set_recognition_result(result)
 
     def _keyboard_question(self) -> None:
         dialog = RecognitionConfirmDialog(
@@ -157,7 +166,14 @@ class MainWindow(QMainWindow):
             instructions="Type the question to send to EdTalkies.",
         )
         if dialog.exec() == RecognitionConfirmDialog.DialogCode.Accepted:
-            self._submit_question(dialog.text())
+            self._recognized_text_panel.set_text(dialog.text(), "keyboard")
+
+    def _ask_ai(self) -> None:
+        self._submit_question(self._recognized_text_panel.text())
+
+    def _clear_board(self) -> None:
+        self._canvas.clear()
+        self._recognized_text_panel.clear()
 
     def _submit_question(self, text: str) -> None:
         prompt = self._prompt_builder.build_teacher_prompt(text)
@@ -291,7 +307,7 @@ class MainWindow(QMainWindow):
         footer.setObjectName("AppFooter")
         layout = QHBoxLayout(footer)
         layout.setContentsMargins(20, 8, 20, 8)
-        label = QLabel("© AR ITWORKS, LLC")
+        label = QLabel("\u00a9 AR ITWORKS, LLC")
         label.setObjectName("AppFooterText")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(label, 1)
@@ -341,6 +357,37 @@ class MainWindow(QMainWindow):
                 font-size: 22px;
                 font-weight: 700;
                 color: #111827;
+            }
+            #RecognizedTextPanel {
+                background: #111827;
+                border-top: 1px solid #374151;
+            }
+            #RecognizedTextTitle {
+                color: #ffffff;
+                font-size: 17px;
+                font-weight: 700;
+            }
+            #RecognizedTextStatus {
+                color: #9ca3af;
+                font-size: 13px;
+            }
+            #RecognizedTextEditor {
+                background: #f9fafb;
+                color: #111827;
+                border: 1px solid #6b7280;
+                border-radius: 6px;
+                padding: 6px;
+                font-size: 18px;
+            }
+            #RecognizedTextPanel QPushButton {
+                min-height: 34px;
+                padding: 4px 12px;
+                border-radius: 5px;
+            }
+            #RecognizedTextAskButton {
+                background: #22c55e;
+                color: #052e16;
+                font-weight: 700;
             }
             """
         )

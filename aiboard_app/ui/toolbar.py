@@ -21,6 +21,7 @@ class WhiteboardToolbar(QFrame):
     undo_requested = Signal()
     redo_requested = Signal()
     recognize_requested = Signal()
+    ask_requested = Signal()
     keyboard_requested = Signal()
     save_requested = Signal()
     exit_requested = Signal()
@@ -64,7 +65,8 @@ class WhiteboardToolbar(QFrame):
             self._button("Undo", self.undo_requested.emit),
             self._button("Redo", self.redo_requested.emit),
             self._button("Clear", self.clear_requested.emit),
-            self._button("Ask AI", self.recognize_requested.emit),
+            self._button("Handwriting to Text", self.recognize_requested.emit),
+            self._button("Ask AI", self.ask_requested.emit),
             self._button("Keyboard", self.keyboard_requested.emit),
             self._button("Save", self.save_requested.emit),
             self._button("Exit", self.exit_requested.emit),
@@ -79,6 +81,8 @@ class WhiteboardToolbar(QFrame):
         button = QPushButton(label)
         button.setMinimumHeight(44)
         button.setMinimumWidth(84)
+        if label == "Handwriting to Text":
+            button.setMinimumWidth(170)
         if callback:
             button.clicked.connect(callback)
         return button

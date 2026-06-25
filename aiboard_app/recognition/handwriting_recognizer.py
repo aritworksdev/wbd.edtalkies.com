@@ -12,7 +12,7 @@ class PlaceholderRecognizer(OcrProvider):
         return RecognitionResult(
             text="Edit this recognized text before sending it to EdTalkies.",
             confidence=None,
-        provider="placeholder",
+            provider="placeholder",
         )
 
 

@@ -10,6 +10,9 @@ class EdTalkiesOcrProvider(OcrProvider):
 
     def recognize(self, image_bytes: bytes) -> RecognitionResult:
         payload = self._client.recognize_handwriting(image_bytes)
+        nested = payload.get("data")
+        if isinstance(nested, dict):
+            payload = {**payload, **nested}
         text = str(payload.get("text") or payload.get("recognizedText") or payload.get("result") or "")
         confidence_value = payload.get("confidence")
         confidence = float(confidence_value) if isinstance(confidence_value, int | float) else None

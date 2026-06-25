@@ -50,12 +50,24 @@ AIBOARD_HANDWRITING_PROVIDER=mock
 
 Supported starter values are `mock`, `edtalkies`, and `local`. The latter is intentionally a placeholder for a future on-device recognizer.
 
+For real handwriting conversion through the EdTalkies OCR endpoint:
+
+```env
+AIBOARD_HANDWRITING_PROVIDER=edtalkies
+EDTALKIES_API_BASE_URL=https://your-edtalkies-host.example
+EDTALKIES_OCR_PATH=/api/ocr/handwriting
+```
+
+With the `mock` provider, the workflow returns placeholder text so the UI can
+be tested without a configured OCR service.
+
 ## Current Features
 
 - Full-screen touch-friendly whiteboard with mouse and stylus support
 - Pen color and thickness, eraser, clear, undo, redo, and PNG save
-- Editable handwriting confirmation dialog
-- Keyboard question entry using the same confirmation/API flow
+- A separate **Handwriting to Text** action that displays recognized text in
+  an editable panel before **Ask AI** can submit it
+- Keyboard question entry using the same visible review/API flow
 - Background API and download operations so the UI remains responsive
 - Configurable EdTalkies API client with timeout, retries, IDs, and mock mode
 - Rich text/HTML response panel with scrolling, copy, save, and document actions
