@@ -78,7 +78,14 @@ class OcrService:
         if trocr is not None:
             candidates.append(trocr)
         if not candidates:
-            raise RuntimeError("; ".join(errors) or "No document OCR provider returned text.")
+            return OcrResult(
+                text="",
+                confidence=0.0,
+                provider="local-ocr",
+                attempts=tuple(attempts),
+                errors=tuple(errors),
+                model_name="No local OCR model returned text",
+            )
         return self._best(candidates).with_pipeline_details(attempts, errors)
 
     def recognize_with_google(self, image_bytes: bytes) -> OcrResult:
@@ -102,6 +109,7 @@ class OcrService:
             provider="google-vision",
             words=tuple(word for result in populated for word in result.words),
             attempts=("google-vision",),
+            model_name="Google Cloud Vision document_text_detection",
         )
 
     @staticmethod
@@ -119,7 +127,7 @@ class OcrService:
         attempts: list[str],
         errors: list[str],
     ) -> OcrResult | None:
-        name = provider.__class__.__name__
+        name = OcrService._provider_name(provider)
         attempts.append(name)
         try:
             result = provider.recognize(image_bytes)
@@ -136,7 +144,7 @@ class OcrService:
         attempts: list[str],
         errors: list[str],
     ) -> OcrResult | None:
-        name = provider.__class__.__name__
+        name = OcrService._provider_name(provider)
         attempts.append(name)
         try:
             recognize_document = getattr(provider, "recognize_document", provider.recognize)
@@ -146,3 +154,7 @@ class OcrService:
             errors.append(f"{name}: {exc}")
             return None
         return result if result.text.strip() else None
+
+    @staticmethod
+    def _provider_name(provider: OcrProvider) -> str:
+        return str(getattr(provider, "model_name", provider.__class__.__name__))

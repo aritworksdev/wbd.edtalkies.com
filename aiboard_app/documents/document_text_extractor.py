@@ -119,7 +119,13 @@ class DocumentTextExtractor:
     def _direct_result(text: str, provider: str) -> OcrResult:
         text = text.strip()
         words = tuple(OcrWord(token, 1.0) for token in text.split())
-        return OcrResult(text=text, confidence=1.0 if text else 0.0, provider=provider, words=words)
+        return OcrResult(
+            text=text,
+            confidence=1.0 if text else 0.0,
+            provider=provider,
+            words=words,
+            model_name="Embedded document text",
+        )
 
     @staticmethod
     def _combine_ocr_results(results: list[OcrResult], provider: str) -> OcrResult:
@@ -135,4 +141,7 @@ class DocumentTextExtractor:
             words=tuple(word for result in populated for word in result.words),
             attempts=tuple(attempt for result in populated for attempt in result.attempts),
             errors=tuple(error for result in populated for error in result.errors),
+            model_name=", ".join(
+                dict.fromkeys(result.model_name or result.provider for result in populated)
+            ),
         )

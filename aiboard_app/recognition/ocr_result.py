@@ -17,6 +17,7 @@ class OcrResult:
     words: tuple[OcrWord, ...] = ()
     attempts: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
+    model_name: str = ""
 
     def with_pipeline_details(
         self,
@@ -30,6 +31,7 @@ class OcrResult:
             words=self.words,
             attempts=tuple(attempts),
             errors=tuple(errors),
+            model_name=self.model_name,
         )
 
     def uncertain_words(self, threshold: float) -> tuple[OcrWord, ...]:

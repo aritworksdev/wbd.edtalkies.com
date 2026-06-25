@@ -61,3 +61,25 @@ def test_low_confidence_shows_google_only_when_available() -> None:
 
     assert panel._google_button.isHidden() is False
     assert panel._rewrite_button.isHidden() is False
+
+
+def test_status_shows_selected_model_confidence_and_fallback_chain() -> None:
+    _app()
+    panel = RecognizedTextPanel()
+    panel.set_recognition_result(
+        OcrResult(
+            "document text",
+            0.72,
+            "tesseract",
+            model_name="Tesseract 5 (eng)",
+            attempts=("PaddleOCR PP-OCRv5 (en)", "Tesseract 5 (eng)"),
+        ),
+        0.85,
+        0.65,
+        google_available=False,
+    )
+
+    status = panel._status.text()
+    assert "Tesseract 5 (eng)" in status
+    assert "72%" in status
+    assert "PaddleOCR PP-OCRv5 (en) -> Tesseract 5 (eng)" in status

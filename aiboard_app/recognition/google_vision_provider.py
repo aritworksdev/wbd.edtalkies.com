@@ -71,4 +71,13 @@ class GoogleVisionProvider(OcrProvider):
                             words.append(OcrWord(text, confidence))
         text = annotation.text.strip()
         confidence = sum(word.confidence for word in words) / len(words) if words else 0.0
-        return OcrResult(text, confidence, "google-vision", tuple(words))
+        return OcrResult(
+            text,
+            confidence,
+            "google-vision",
+            tuple(words),
+            model_name=self.model_name,
+        )
+    @property
+    def model_name(self) -> str:
+        return "Google Cloud Vision document_text_detection"

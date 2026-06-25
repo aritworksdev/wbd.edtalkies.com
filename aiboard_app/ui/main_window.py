@@ -235,26 +235,24 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Extraction error", "The document extraction result is invalid.")
             return
         result = extraction.result
-        if not isinstance(result, OcrResult) or not result.text.strip():
+        if not isinstance(result, OcrResult):
+            QMessageBox.warning(self, "Extraction error", "The document OCR result is invalid.")
+            return
+        self._google_ocr_sources = extraction.google_vision_images
+        google_available = self._recognizer.google_available and bool(self._google_ocr_sources)
+        if not result.text.strip() and not google_available:
             QMessageBox.warning(
                 self,
                 "No text found",
                 f"No readable text could be extracted from {path.name}.",
             )
             return
-        self._google_ocr_sources = extraction.google_vision_images
         self._recognized_text_panel.set_recognition_result(
             result,
             self._recognizer.high_confidence,
             self._recognizer.medium_confidence,
-            self._recognizer.google_available and bool(self._google_ocr_sources),
+            google_available,
         )
-        local_failures = "; ".join(result.errors)
-        if result.provider == "trocr" and local_failures:
-            self._recognized_text_panel.set_status(
-                f"{path.name}: printed-document OCR providers were unavailable. "
-                "Install PaddleOCR or Tesseract, or use Google Vision OCR."
-            )
         self._recognized_revision = self._canvas.revision
 
     def _ask_ai(self) -> None:

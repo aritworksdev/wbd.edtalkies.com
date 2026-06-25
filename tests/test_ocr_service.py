@@ -151,3 +151,21 @@ def test_multiple_google_pages_are_combined() -> None:
 
     assert result.text == "page one\n\npage two"
     assert google.calls == 2
+
+
+def test_empty_document_pipeline_returns_diagnostics_for_google_fallback() -> None:
+    service = OcrService(
+        FakeProvider(error=RuntimeError("paddle unavailable")),
+        FakeProvider(OcrResult.empty("trocr")),
+        FakeProvider(error=RuntimeError("tesseract unavailable")),
+        None,
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize_document(b"image")
+
+    assert result.text == ""
+    assert result.confidence == 0.0
+    assert result.model_name == "No local OCR model returned text"
+    assert len(result.attempts) == 3

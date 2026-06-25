@@ -15,6 +15,10 @@ class PaddleOcrProvider(OcrProvider):
         self._language = language
         self._engine: Any = None
 
+    @property
+    def model_name(self) -> str:
+        return f"PaddleOCR PP-OCRv5 ({self._language})"
+
     def recognize(self, image_bytes: bytes) -> OcrResult:
         if not image_bytes:
             return OcrResult.empty("paddleocr")
@@ -117,4 +121,10 @@ class PaddleOcrProvider(OcrProvider):
     def _result(words: list[OcrWord]) -> OcrResult:
         text = " ".join(word.text for word in words)
         confidence = sum(word.confidence for word in words) / len(words) if words else 0.0
-        return OcrResult(text, confidence, "paddleocr", tuple(words))
+        return OcrResult(
+            text,
+            confidence,
+            "paddleocr",
+            tuple(words),
+            model_name="PaddleOCR PP-OCRv5",
+        )

@@ -19,6 +19,10 @@ class TesseractProvider(OcrProvider):
         self._command = command
         self._language = language
 
+    @property
+    def model_name(self) -> str:
+        return f"Tesseract 5 ({self._language})"
+
     def recognize(self, image_bytes: bytes) -> OcrResult:
         try:
             import pytesseract
@@ -76,4 +80,5 @@ class TesseractProvider(OcrProvider):
             confidence=overall,
             provider="tesseract",
             words=tuple(words),
+            model_name=self.model_name,
         )

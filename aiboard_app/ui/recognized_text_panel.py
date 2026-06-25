@@ -30,6 +30,7 @@ class RecognizedTextPanel(QFrame):
         title.setObjectName("RecognizedTextTitle")
         self._status = QLabel("Write on the board, then click Ask AI to convert it to text.")
         self._status.setObjectName("RecognizedTextStatus")
+        self._status.setWordWrap(True)
 
         clear_button = QPushButton("Clear Text")
         clear_button.clicked.connect(self.clear)
@@ -90,21 +91,26 @@ class RecognizedTextPanel(QFrame):
         self._set_plain_text(result.text)
         confidence = result.confidence or 0.0
         self._low_confidence_edited = False
+        diagnostic = self._ocr_diagnostic(result)
+        self._status.setToolTip(
+            "\n".join(
+                [
+                    diagnostic,
+                    *(f"Provider error: {error}" for error in result.errors),
+                ]
+            )
+        )
 
         if confidence >= high_threshold:
             self._band = "high"
-            self._status.setText(
-                f"Recognized by {result.provider} ({confidence:.0%}). Ready to send."
-            )
+            self._status.setText(f"{diagnostic} Ready to send.")
             self._rewrite_button.hide()
             self._google_button.hide()
             self._ask_button.setEnabled(True)
             self._ask_button.setText("Ask EdTalkies")
         elif confidence >= medium_threshold:
             self._band = "medium"
-            self._status.setText(
-                f"Recognition confidence is {confidence:.0%}. Review highlighted words."
-            )
+            self._status.setText(f"{diagnostic} Review highlighted words.")
             self._highlight_uncertain_words(result, high_threshold)
             self._rewrite_button.show()
             self._google_button.setVisible(google_available)
@@ -113,7 +119,7 @@ class RecognizedTextPanel(QFrame):
         else:
             self._band = "low"
             action = "Rewrite or use Google Vision OCR." if google_available else "Rewrite or edit the text."
-            self._status.setText(f"Low OCR confidence ({confidence:.0%}). {action}")
+            self._status.setText(f"{diagnostic} Low confidence. {action}")
             self._highlight_uncertain_words(result, medium_threshold)
             self._rewrite_button.show()
             self._google_button.setVisible(google_available)
@@ -122,11 +128,19 @@ class RecognizedTextPanel(QFrame):
 
         self._editor.setFocus()
 
+    @staticmethod
+    def _ocr_diagnostic(result: OcrResult) -> str:
+        model = result.model_name or result.provider
+        confidence = result.confidence or 0.0
+        chain = " -> ".join(result.attempts) if result.attempts else model
+        return f"OCR: {model} | Confidence: {confidence:.0%} | Fallbacks: {chain}."
+
     def clear(self) -> None:
         self._set_plain_text("")
         self._band = "none"
         self._low_confidence_edited = False
         self._status.setText("Write on the board, then click Ask AI to convert it to text.")
+        self._status.setToolTip("")
         self._rewrite_button.hide()
         self._google_button.hide()
         self._ask_button.setEnabled(False)

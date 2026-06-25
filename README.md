@@ -85,6 +85,19 @@ AiBoard automatically detects whether an uploaded image is a normal
 black-text-on-white document or a light-on-dark board image before OCR.
 Mixed PDFs preserve embedded text and OCR only scanned pages.
 
+The recognized-text status line reports the selected OCR model, confidence,
+and fallback chain, for example:
+
+```text
+OCR: Tesseract 5 (eng) | Confidence: 72% |
+Fallbacks: PaddleOCR PP-OCRv5 (en) -> Tesseract 5 (eng)
+```
+
+For printed PNG/JPEG documents, PaddleOCR or Tesseract should normally produce
+the best result. If the status shows TrOCR or `No local OCR model returned
+text`, verify the PaddleOCR installation and `TESSERACT_CMD`. When Google
+Vision is configured, low/empty local results expose **Use Google Vision OCR**.
+
 PNG/JPEG document extraction uses a printed-document pipeline:
 
 1. PaddleOCR

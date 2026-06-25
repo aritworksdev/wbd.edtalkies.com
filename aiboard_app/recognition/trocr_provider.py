@@ -19,4 +19,8 @@ class TrOcrProvider(LocalOcrProvider):
             confidence=confidence,
             provider="trocr",
             words=words,
+            model_name=self.model_name,
         )
+    @property
+    def model_name(self) -> str:
+        return self._model_id
