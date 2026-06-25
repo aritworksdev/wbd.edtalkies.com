@@ -64,8 +64,6 @@ class AppSettings:
     log_level: str
     edtalkies: EdTalkiesSettings
     local_handwriting_model: str = "microsoft/trocr-base-handwritten"
-    auto_recognize: bool = True
-    auto_recognize_delay_ms: int = 1800
 
 
 def load_settings(env_file: str | Path | None = None) -> AppSettings:
@@ -107,6 +105,4 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             "AIBOARD_LOCAL_HANDWRITING_MODEL",
             "microsoft/trocr-base-handwritten",
         ),
-        auto_recognize=_bool_env("AIBOARD_AUTO_RECOGNIZE", True),
-        auto_recognize_delay_ms=_int_env("AIBOARD_AUTO_RECOGNIZE_DELAY_MS", 1800),
     )

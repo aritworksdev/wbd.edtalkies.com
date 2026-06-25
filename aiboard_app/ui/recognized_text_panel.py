@@ -22,7 +22,7 @@ class RecognizedTextPanel(QFrame):
         header = QHBoxLayout()
         title = QLabel("Recognized Text")
         title.setObjectName("RecognizedTextTitle")
-        self._status = QLabel("Write on the board; text appears automatically after you pause.")
+        self._status = QLabel("Write on the board, then click Ask AI to convert it to text.")
         self._status.setObjectName("RecognizedTextStatus")
         clear_button = QPushButton("Clear Text")
         clear_button.clicked.connect(self.clear)
@@ -61,7 +61,7 @@ class RecognizedTextPanel(QFrame):
 
     def clear(self) -> None:
         self._editor.clear()
-        self._status.setText("Write on the board; text appears automatically after you pause.")
+        self._status.setText("Write on the board, then click Ask AI to convert it to text.")
 
     def set_status(self, message: str) -> None:
         self._status.setText(message)

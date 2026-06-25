@@ -43,6 +43,9 @@ class LocalOcrProvider(OcrProvider):
                     return_dict_in_generate=True,
                     output_scores=True,
                     max_new_tokens=128,
+                    num_beams=4,
+                    early_stopping=True,
+                    no_repeat_ngram_size=2,
                 )
             text = self._processor.batch_decode(generated.sequences, skip_special_tokens=True)[0].strip()
             if text:

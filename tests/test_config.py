@@ -23,4 +23,3 @@ def test_legacy_mock_provider_migrates_to_real_local_ocr(monkeypatch) -> None:  
     settings = load_settings()
 
     assert settings.handwriting_provider == "local"
-    assert settings.auto_recognize is True

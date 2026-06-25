@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -79,12 +79,8 @@ class MainWindow(QMainWindow):
         self._thread_pool = QThreadPool.globalInstance()
         self._progress: QProgressDialog | None = None
         self._active_workers: set[BackgroundWorker] = set()
-        self._auto_recognition_in_progress = False
-        self._auto_recognition_pending = False
-        self._auto_recognition_timer = QTimer(self)
-        self._auto_recognition_timer.setSingleShot(True)
-        self._auto_recognition_timer.setInterval(max(500, settings.auto_recognize_delay_ms))
-        self._auto_recognition_timer.timeout.connect(self._start_auto_recognition)
+        self._recognized_revision: int | None = None
+        self._recognition_in_progress = False
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -132,7 +128,6 @@ class MainWindow(QMainWindow):
         self._toolbar.clear_requested.connect(self._clear_board)
         self._toolbar.undo_requested.connect(self._canvas.undo)
         self._toolbar.redo_requested.connect(self._canvas.redo)
-        self._toolbar.recognize_requested.connect(self._recognize_handwriting)
         self._toolbar.ask_requested.connect(self._ask_ai)
         self._toolbar.keyboard_requested.connect(self._keyboard_question)
         self._toolbar.save_requested.connect(self._save_board_image)
@@ -141,66 +136,27 @@ class MainWindow(QMainWindow):
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
         self._recognized_text_panel.ask_requested.connect(self._ask_ai)
-        self._canvas.content_changed.connect(self._schedule_auto_recognition)
 
-    def _schedule_auto_recognition(self, revision: int) -> None:
-        if not self._settings.auto_recognize:
-            return
-        if self._auto_recognition_in_progress:
-            self._auto_recognition_pending = True
-            return
-        self._recognized_text_panel.set_status("Waiting for writing to pause...")
-        self._auto_recognition_timer.start()
-
-    def _start_auto_recognition(self) -> None:
-        if self._auto_recognition_in_progress:
-            self._auto_recognition_pending = True
+    def _recognize_handwriting(self) -> None:
+        if self._recognition_in_progress:
             return
         revision = self._canvas.revision
         image_bytes = self._canvas.to_png_bytes()
-        self._auto_recognition_in_progress = True
-        self._auto_recognition_pending = False
-        self._recognized_text_panel.set_status("Recognizing handwriting...")
-        self._run_background(
-            "",
-            lambda: self._recognizer.recognize(image_bytes),
-            lambda result: self._display_auto_recognition(result, revision),
-            "Recognition failed",
-            show_progress=False,
-            on_complete=self._complete_auto_recognition,
-        )
-
-    def _display_auto_recognition(self, result: object, revision: int) -> None:
-        if revision != self._canvas.revision:
-            self._auto_recognition_pending = True
-            return
-        if not isinstance(result, RecognitionResult):
-            self._recognized_text_panel.set_status("Recognition returned an invalid result.")
-            return
-        if result.text.strip():
-            self._recognized_text_panel.set_recognition_result(result)
-        else:
-            self._recognized_text_panel.set_status(
-                "No readable handwriting found. Write larger with clear spacing."
-            )
-
-    def _complete_auto_recognition(self) -> None:
-        self._auto_recognition_in_progress = False
-        if self._auto_recognition_pending:
-            self._auto_recognition_pending = False
-            self._auto_recognition_timer.start()
-
-    def _recognize_handwriting(self) -> None:
-        self._auto_recognition_timer.stop()
-        image_bytes = self._canvas.to_png_bytes()
+        self._recognition_in_progress = True
         self._run_background(
             "Converting handwriting to text...",
             lambda: self._recognizer.recognize(image_bytes),
-            self._display_recognized_text,
+            lambda result: self._display_recognized_text(result, revision),
             "Recognition failed",
+            on_complete=self._complete_recognition,
         )
 
-    def _display_recognized_text(self, result: object) -> None:
+    def _display_recognized_text(self, result: object, revision: int) -> None:
+        if revision != self._canvas.revision:
+            self._recognized_text_panel.set_status(
+                "The board changed during recognition. Click Ask AI again."
+            )
+            return
         if not isinstance(result, RecognitionResult):
             QMessageBox.critical(self, "Recognition failed", "The recognizer returned an invalid result.")
             return
@@ -208,10 +164,14 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "No handwriting recognized",
-                "No readable text was found. Try writing larger and run Handwriting to Text again.",
+                "No readable text was found. Try writing larger and click Ask AI again.",
             )
             return
         self._recognized_text_panel.set_recognition_result(result)
+        self._recognized_revision = revision
+
+    def _complete_recognition(self) -> None:
+        self._recognition_in_progress = False
 
     def _keyboard_question(self) -> None:
         dialog = RecognitionConfirmDialog(
@@ -222,14 +182,17 @@ class MainWindow(QMainWindow):
         )
         if dialog.exec() == RecognitionConfirmDialog.DialogCode.Accepted:
             self._recognized_text_panel.set_text(dialog.text(), "keyboard")
+            self._recognized_revision = self._canvas.revision
 
     def _ask_ai(self) -> None:
+        if self._recognized_revision != self._canvas.revision:
+            self._recognize_handwriting()
+            return
         self._submit_question(self._recognized_text_panel.text())
 
     def _clear_board(self) -> None:
-        self._auto_recognition_timer.stop()
         self._canvas.clear()
-        self._auto_recognition_timer.stop()
+        self._recognized_revision = None
         self._recognized_text_panel.clear()
 
     def _submit_question(self, text: str) -> None:

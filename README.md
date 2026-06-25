@@ -47,8 +47,6 @@ Real local handwriting recognition is enabled by default:
 ```env
 AIBOARD_HANDWRITING_PROVIDER=local
 AIBOARD_LOCAL_HANDWRITING_MODEL=microsoft/trocr-base-handwritten
-AIBOARD_AUTO_RECOGNIZE=true
-AIBOARD_AUTO_RECOGNIZE_DELAY_MS=1800
 ```
 
 The local provider uses Microsoft's TrOCR handwritten model. On first use it
@@ -59,6 +57,10 @@ cache and does not send the board image to an OCR service.
 Allow roughly 2 GB of free disk space for Python OCR dependencies and cached
 model files. Recognition runs on the CPU unless the installed PyTorch runtime
 and Windows device support compatible acceleration.
+
+Handwriting OCR is probabilistic and cannot guarantee 100% accuracy for every
+writing style, pen thickness, or symbol. Write in clear horizontal lines and
+review the editable recognized text before submitting it.
 
 For real handwriting conversion through the EdTalkies OCR endpoint:
 
@@ -79,10 +81,8 @@ AiBoard now migrates that value to local OCR unless
 
 - Full-screen touch-friendly whiteboard with mouse and stylus support
 - Pen color and thickness, eraser, clear, undo, redo, and PNG save
-- A separate **Handwriting to Text** action that displays recognized text in
-  an editable panel before **Ask AI** can submit it
-- Automatic conversion after mouse or stylus writing pauses, with recognized
-  text placed directly in the editable text box
+- A two-stage **Ask AI** flow: the first click converts the current board into
+  editable text; after review, the second click submits it to the API
 - Real local handwriting OCR with blackboard preprocessing and multiline
   recognition using TrOCR
 - Keyboard question entry using the same visible review/API flow
