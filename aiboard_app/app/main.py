@@ -33,7 +33,11 @@ def main() -> int:
         recognizer=recognizer,
         response_parser=ResponseParser(),
         prompt_builder=PromptBuilder(),
-        document_manager=DocumentManager(settings.export_dir, settings.edtalkies.timeout_seconds),
+        document_manager=DocumentManager(
+            settings.export_dir,
+            settings.edtalkies.timeout_seconds,
+            recognizer,
+        ),
         shutdown_manager=ShutdownManager(settings),
     )
     window.start()

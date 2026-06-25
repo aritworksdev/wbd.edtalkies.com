@@ -63,6 +63,24 @@ python main.py
 
 The app opens full-screen by default. For development, set `AIBOARD_FULLSCREEN=false` in `.env`.
 
+## Upload and Extract Document Text
+
+Select **Upload Document** from the toolbar. AiBoard extracts the content in a
+background worker and places it in the same editable review panel used for
+handwriting. Review the text, then select **Ask EdTalkies**.
+
+Supported formats:
+
+- PDF, including scanned PDFs through the OCR pipeline
+- DOCX, including paragraphs and table cells
+- TXT and Markdown
+- HTML
+- PNG, JPEG, BMP, and TIFF images
+
+Large scanned PDFs can take time because every page must be rendered and
+recognized. The board remains responsive and displays extraction status while
+the work continues.
+
 ## Configure EdTalkies
 
 Edit `.env`:
@@ -150,6 +168,8 @@ The credential JSON must contain `type`, `project_id`, `private_key_id`,
 - Optional, explicit Google Vision fallback for low-confidence recognition
 - Uncertain-word highlighting and editable text before every API submission
 - Keyboard question entry using the same visible review/API flow
+- Document upload and editable text extraction for PDF, DOCX, text, Markdown,
+  HTML, images, and scanned PDFs
 - Background API and download operations so the UI remains responsive
 - Configurable EdTalkies API client with timeout, retries, IDs, and mock mode
 - Rich text/HTML response panel with scrolling, copy, save, and document actions
@@ -181,6 +201,10 @@ AIBOARD_CONFIRM_EXIT=true
 ```powershell
 pytest
 ```
+
+OCR, document extraction, and API requests run outside the Qt UI thread. The
+application uses a non-modal busy status instead of blocking the board with a
+modal loading dialog.
 
 ## Suggested Next Milestone
 

@@ -135,6 +135,14 @@ class RecognizedTextPanel(QFrame):
     def set_status(self, message: str) -> None:
         self._status.setText(message)
 
+    def set_busy(self, busy: bool, message: str = "") -> None:
+        if message:
+            self._status.setText(message)
+        self._ask_button.setEnabled(not busy and self.can_submit)
+        self._rewrite_button.setEnabled(not busy)
+        self._google_button.setEnabled(not busy)
+        self._editor.setReadOnly(busy)
+
     def _set_plain_text(self, text: str) -> None:
         self._programmatic_change = True
         self._editor.setPlainText(text)

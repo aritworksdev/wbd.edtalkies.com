@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
-    QProgressDialog,
     QVBoxLayout,
     QWidget,
 )
@@ -77,10 +78,12 @@ class MainWindow(QMainWindow):
         self._document_manager = document_manager
         self._shutdown_manager = shutdown_manager
         self._thread_pool = QThreadPool.globalInstance()
-        self._progress: QProgressDialog | None = None
+        self._thread_pool.setMaxThreadCount(max(2, min(4, self._thread_pool.maxThreadCount())))
         self._active_workers: set[BackgroundWorker] = set()
+        self._busy_count = 0
         self._recognized_revision: int | None = None
         self._recognition_in_progress = False
+        self._google_ocr_source: bytes | None = None
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -130,6 +133,7 @@ class MainWindow(QMainWindow):
         self._toolbar.redo_requested.connect(self._canvas.redo)
         self._toolbar.ask_requested.connect(self._ask_ai)
         self._toolbar.keyboard_requested.connect(self._keyboard_question)
+        self._toolbar.document_requested.connect(self._upload_document)
         self._toolbar.save_requested.connect(self._save_board_image)
         self._toolbar.exit_requested.connect(self._exit)
         self._response_panel.close_requested.connect(self._response_panel.hide)
@@ -144,6 +148,7 @@ class MainWindow(QMainWindow):
             return
         revision = self._canvas.revision
         image_bytes = self._canvas.to_png_bytes()
+        self._google_ocr_source = image_bytes
         self._recognition_in_progress = True
         self._run_background(
             "Converting handwriting to text...",
@@ -190,6 +195,62 @@ class MainWindow(QMainWindow):
         if dialog.exec() == RecognitionConfirmDialog.DialogCode.Accepted:
             self._recognized_text_panel.set_text(dialog.text(), "keyboard")
             self._recognized_revision = self._canvas.revision
+            self._google_ocr_source = None
+
+    def _upload_document(self) -> None:
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Upload document and extract text",
+            "",
+            (
+                "Supported documents (*.pdf *.docx *.txt *.md *.markdown *.html *.htm "
+                "*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;"
+                "PDF files (*.pdf);;Word files (*.docx);;Text files (*.txt *.md *.markdown);;"
+                "HTML files (*.html *.htm);;Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)"
+            ),
+        )
+        if not file_name:
+            return
+        path = Path(file_name)
+        self._run_background(
+            f"Extracting text from {path.name}...",
+            lambda: self._extract_document_payload(path),
+            self._display_document_text,
+            "Document extraction failed",
+        )
+
+    def _extract_document_payload(self, path: Path) -> tuple[OcrResult, Path, bytes | None]:
+        result = self._document_manager.extract_text(path)
+        image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+        google_source = path.read_bytes() if path.suffix.lower() in image_extensions else None
+        return result, path, google_source
+
+    def _display_document_text(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 3:
+            QMessageBox.warning(self, "Extraction error", "The document extractor returned invalid data.")
+            return
+        result, path, google_source = payload
+        if not isinstance(path, Path):
+            QMessageBox.warning(self, "Extraction error", "The selected document path is invalid.")
+            return
+        if not isinstance(result, OcrResult) or not result.text.strip():
+            QMessageBox.warning(
+                self,
+                "No text found",
+                f"No readable text could be extracted from {path.name}.",
+            )
+            return
+        self._google_ocr_source = google_source if isinstance(google_source, bytes) else None
+        self._recognized_text_panel.set_recognition_result(
+            result,
+            self._recognizer.high_confidence,
+            self._recognizer.medium_confidence,
+            self._recognizer.google_available and self._google_ocr_source is not None,
+        )
+        self._recognized_text_panel.set_status(
+            f"Extracted from {path.name} using {result.provider}. Review before sending."
+        )
+        self._recognized_revision = self._canvas.revision
 
     def _ask_ai(self) -> None:
         if self._recognized_revision != self._canvas.revision:
@@ -216,10 +277,10 @@ class MainWindow(QMainWindow):
         self._submit_question(self._recognized_text_panel.text())
 
     def _recognize_with_google(self) -> None:
-        if not self._recognizer.google_available:
+        if not self._recognizer.google_available or self._google_ocr_source is None:
             return
         revision = self._canvas.revision
-        image_bytes = self._canvas.to_png_bytes()
+        image_bytes = self._google_ocr_source
         self._run_background(
             "Using Google Vision OCR...",
             lambda: self._recognizer.recognize_with_google(image_bytes),
@@ -230,6 +291,7 @@ class MainWindow(QMainWindow):
     def _clear_board(self) -> None:
         self._canvas.clear()
         self._recognized_revision = None
+        self._google_ocr_source = None
         self._recognized_text_panel.clear()
 
     def _submit_question(self, text: str) -> None:
@@ -303,19 +365,12 @@ class MainWindow(QMainWindow):
         show_progress: bool = True,
         on_complete: Callable[[], None] | None = None,
     ) -> None:
-        progress: QProgressDialog | None = None
-        if show_progress:
-            progress = QProgressDialog(message, "", 0, 0, self)
-            progress.setWindowModality(Qt.WindowModality.WindowModal)
-            progress.setCancelButton(None)
-            progress.setMinimumDuration(0)
-            progress.show()
-            self._progress = progress
+        self._set_busy(True, message if show_progress else "")
 
         worker = BackgroundWorker(task)
-        worker.signals.succeeded.connect(lambda result: self._finish_background(progress, on_success, result))
+        worker.signals.succeeded.connect(lambda result: self._finish_background(on_success, result))
         worker.signals.failed.connect(
-            lambda error: self._fail_background(progress, error_title, error, show_progress)
+            lambda error: self._fail_background(error_title, error, show_progress)
         )
         worker.signals.finished.connect(lambda: self._release_worker(worker, on_complete))
         self._active_workers.add(worker)
@@ -327,32 +382,35 @@ class MainWindow(QMainWindow):
         on_complete: Callable[[], None] | None = None,
     ) -> None:
         self._active_workers.discard(worker)
+        self._set_busy(False)
         if on_complete is not None:
             on_complete()
 
     def _finish_background(
         self,
-        progress: QProgressDialog | None,
         callback: Callable[[object], None],
         result: object,
     ) -> None:
-        if progress is not None:
-            progress.close()
         callback(result)
 
     def _fail_background(
         self,
-        progress: QProgressDialog | None,
         title: str,
         error: str,
         show_dialog: bool = True,
     ) -> None:
-        if progress is not None:
-            progress.close()
         if show_dialog:
             QMessageBox.critical(self, title, error)
         else:
             self._recognized_text_panel.set_status(f"{title}: {error}")
+
+    def _set_busy(self, busy: bool, message: str = "") -> None:
+        self._busy_count = max(0, self._busy_count + (1 if busy else -1))
+        is_busy = self._busy_count > 0
+        self._toolbar.set_busy(is_busy)
+        self._recognized_text_panel.set_busy(is_busy, message)
+        self._canvas.setEnabled(not is_busy)
+        QApplication.processEvents()
 
     def _exit(self) -> None:
         self._shutdown_manager.perform_exit(self)
