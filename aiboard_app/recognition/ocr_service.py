@@ -44,8 +44,6 @@ class OcrService:
         trocr = self._try_provider(self._trocr, image_bytes, attempts, errors)
         if trocr is not None:
             candidates.append(trocr)
-            if self._confidence(trocr) >= self.medium_confidence:
-                return self._best(candidates).with_pipeline_details(attempts, errors)
 
         tesseract = self._try_provider(self._tesseract, image_bytes, attempts, errors)
         if tesseract is not None:
@@ -54,7 +52,13 @@ class OcrService:
         if not candidates:
             message = "; ".join(errors) or "No OCR provider returned text."
             raise RuntimeError(message)
-        return self._best(candidates).with_pipeline_details(attempts, errors)
+        local_result = self._best(candidates)
+        return self._use_google_below_high_confidence(
+            local_result,
+            image_bytes,
+            attempts,
+            errors,
+        )
 
     def recognize_document(self, image_bytes: bytes) -> OcrResult:
         """Printed-document path: PaddleOCR, enhanced Tesseract, then TrOCR."""
@@ -78,15 +82,20 @@ class OcrService:
         if trocr is not None:
             candidates.append(trocr)
         if not candidates:
-            return OcrResult(
+            local_result = OcrResult(
                 text="",
                 confidence=0.0,
                 provider="local-ocr",
-                attempts=tuple(attempts),
-                errors=tuple(errors),
                 model_name="No local OCR model returned text",
             )
-        return self._best(candidates).with_pipeline_details(attempts, errors)
+        else:
+            local_result = self._best(candidates)
+        return self._use_google_below_high_confidence(
+            local_result,
+            image_bytes,
+            attempts,
+            errors,
+        )
 
     def recognize_with_google(self, image_bytes: bytes) -> OcrResult:
         if not self.google_available or self._google is None:
@@ -111,6 +120,32 @@ class OcrService:
             attempts=("google-vision",),
             model_name="Google Cloud Vision document_text_detection",
         )
+
+    def _use_google_below_high_confidence(
+        self,
+        local_result: OcrResult,
+        image_bytes: bytes,
+        attempts: list[str],
+        errors: list[str],
+    ) -> OcrResult:
+        if self._confidence(local_result) >= self.high_confidence:
+            return local_result.with_pipeline_details(attempts, errors)
+        if not self.google_available or self._google is None:
+            return local_result.with_pipeline_details(attempts, errors)
+
+        google_name = self._provider_name(self._google)
+        attempts.append(google_name)
+        try:
+            google_result = self._google.recognize(image_bytes)
+        except Exception as exc:
+            LOGGER.warning("%s failed: %s", google_name, exc)
+            errors.append(f"{google_name}: {exc}")
+            return local_result.with_pipeline_details(attempts, errors)
+
+        if not google_result.text.strip():
+            errors.append(f"{google_name}: returned no text")
+            return local_result.with_pipeline_details(attempts, errors)
+        return google_result.with_pipeline_details(attempts, errors)
 
     @staticmethod
     def _confidence(result: OcrResult) -> float:

@@ -51,7 +51,7 @@ def test_low_paddle_uses_handwriting_fallback() -> None:
     service = OcrService(
         FakeProvider(_result("paddleocr", 0.52)),
         FakeProvider(_result("trocr", 0.82)),
-        FakeProvider(_result("tesseract", 0.95)),
+        FakeProvider(_result("tesseract", 0.55)),
         None,
         0.85,
         0.65,
@@ -61,6 +61,60 @@ def test_low_paddle_uses_handwriting_fallback() -> None:
 
     assert result.provider == "trocr"
     assert "FakeProvider" in result.attempts
+
+
+def test_google_runs_automatically_when_best_local_confidence_is_below_high() -> None:
+    class FakeGoogle:
+        available = True
+        model_name = "Google Cloud Vision document_text_detection"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def recognize(self, image_bytes: bytes) -> OcrResult:
+            self.calls += 1
+            return _result("google-vision", 0.96, "cloud result")
+
+    google = FakeGoogle()
+    service = OcrService(
+        FakeProvider(_result("paddleocr", 0.52)),
+        FakeProvider(_result("trocr", 0.46)),
+        FakeProvider(_result("tesseract", 0.61)),
+        google,  # type: ignore[arg-type]
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize(b"image")
+
+    assert google.calls == 1
+    assert result.provider == "google-vision"
+    assert result.text == "cloud result"
+    assert result.attempts[-1] == "Google Cloud Vision document_text_detection"
+
+
+def test_google_failure_preserves_best_local_result() -> None:
+    class FailingGoogle:
+        available = True
+        model_name = "Google Cloud Vision document_text_detection"
+
+        def recognize(self, image_bytes: bytes) -> OcrResult:
+            raise RuntimeError("network unavailable")
+
+    service = OcrService(
+        FakeProvider(_result("paddleocr", 0.40)),
+        FakeProvider(_result("trocr", 0.46)),
+        FakeProvider(_result("tesseract", 0.62)),
+        FailingGoogle(),  # type: ignore[arg-type]
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize(b"image")
+
+    assert result.provider == "tesseract"
+    assert result.confidence == 0.62
+    assert any("network unavailable" in error for error in result.errors)
 
 
 def test_tesseract_runs_when_primary_local_providers_fail() -> None:

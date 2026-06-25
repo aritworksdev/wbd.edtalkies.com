@@ -156,9 +156,12 @@ GOOGLE_APPLICATION_CREDENTIALS=./config/google-vision-service-account.json
 GOOGLE_CLOUD_PROJECT_ID=edtalkies
 ```
 
-Google Vision is never called automatically. The option is shown only for
-low/uncertain-confidence image or scanned-PDF results when it is enabled and
-the credential file exists. Select **Use Google Vision OCR** to invoke it.
+When Google Vision is enabled and its credential file is valid, AiBoard calls
+it automatically whenever the best local OCR confidence is below
+`OCR_CONFIDENCE_HIGH` (85% by default). If Google Vision fails, the strongest
+local result remains editable and the cloud error appears in the OCR
+diagnostics. The manual **Use Google Vision OCR** action remains available for
+another attempt on low-confidence image or scanned-PDF results.
 
 Copy
 `config/google-vision-service-account.example.json.template` to
@@ -179,8 +182,8 @@ The credential JSON must contain `type`, `project_id`, `private_key_id`,
    evaluates the handwriting.
 3. If the primary local models fail or remain low confidence, Tesseract runs.
 4. AiBoard selects the strongest local result.
-5. Google Vision is offered only for low-confidence results and only when
-   explicitly enabled with a valid local credential file.
+5. If the strongest local result is below 85%, Google Vision runs
+   automatically when enabled with valid credentials.
 
 - **85% and above:** normal editable text; **Ask EdTalkies** is enabled.
 - **65%–84%:** uncertain words are highlighted and confirmation is required.
