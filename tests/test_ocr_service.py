@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+from pathlib import Path
+import json
+
+from aiboard_app.recognition.google_vision_provider import GoogleVisionProvider
+from aiboard_app.recognition.ocr_result import OcrResult, OcrWord
+from aiboard_app.recognition.ocr_service import OcrService
+
+
+class FakeProvider:
+    def __init__(self, result: OcrResult | None = None, error: Exception | None = None) -> None:
+        self.result = result or OcrResult.empty("fake")
+        self.error = error
+        self.calls = 0
+
+    def recognize(self, image_bytes: bytes) -> OcrResult:
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return self.result
+
+
+def _result(provider: str, confidence: float, text: str = "hello world") -> OcrResult:
+    return OcrResult(
+        text=text,
+        confidence=confidence,
+        provider=provider,
+        words=(OcrWord("hello", confidence), OcrWord("world", confidence)),
+    )
+
+
+def test_high_confidence_paddle_stops_pipeline() -> None:
+    paddle = FakeProvider(_result("paddleocr", 0.91))
+    trocr = FakeProvider(_result("trocr", 0.99))
+    tesseract = FakeProvider(_result("tesseract", 0.99))
+    service = OcrService(paddle, trocr, tesseract, None, 0.85, 0.65)
+
+    result = service.recognize(b"image")
+
+    assert result.provider == "paddleocr"
+    assert paddle.calls == 1
+    assert trocr.calls == 0
+    assert tesseract.calls == 0
+
+
+def test_low_paddle_uses_handwriting_fallback() -> None:
+    service = OcrService(
+        FakeProvider(_result("paddleocr", 0.52)),
+        FakeProvider(_result("trocr", 0.82)),
+        FakeProvider(_result("tesseract", 0.95)),
+        None,
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize(b"image")
+
+    assert result.provider == "trocr"
+    assert "FakeProvider" in result.attempts
+
+
+def test_tesseract_runs_when_primary_local_providers_fail() -> None:
+    service = OcrService(
+        FakeProvider(error=RuntimeError("paddle unavailable")),
+        FakeProvider(error=RuntimeError("trocr unavailable")),
+        FakeProvider(_result("tesseract", 0.73)),
+        None,
+        0.85,
+        0.65,
+    )
+
+    result = service.recognize(b"image")
+
+    assert result.provider == "tesseract"
+    assert len(result.errors) == 2
+
+
+def test_google_is_unavailable_without_valid_credentials(tmp_path: Path) -> None:
+    missing = GoogleVisionProvider(tmp_path / "missing.json", "edtalkies")
+    invalid_path = tmp_path / "invalid.json"
+    invalid_path.write_text("{}", encoding="utf-8")
+    invalid = GoogleVisionProvider(invalid_path, "edtalkies")
+
+    assert missing.available is False
+    assert invalid.available is False
+
+
+def test_google_is_available_with_service_account_shape(tmp_path: Path) -> None:
+    credentials = tmp_path / "google.json"
+    credentials.write_text(
+        json.dumps(
+            {
+                "type": "service_account",
+                "project_id": "edtalkies",
+                "private_key_id": "id",
+                "private_key": "key",
+                "client_email": "ocr@example.test",
+                "client_id": "client",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": "https://example.test/cert",
+                "universe_domain": "googleapis.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert GoogleVisionProvider(credentials, "edtalkies").available is True

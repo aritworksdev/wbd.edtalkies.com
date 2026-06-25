@@ -23,7 +23,7 @@ from aiboard_app.ai.response_parser import ResponseParser
 from aiboard_app.app.config import AppSettings
 from aiboard_app.documents.document_manager import DocumentManager
 from aiboard_app.recognition.handwriting_recognizer import HandwritingRecognizer
-from aiboard_app.recognition.ocr_provider_base import RecognitionResult
+from aiboard_app.recognition.ocr_result import OcrResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
 from aiboard_app.ui.recognized_text_panel import RecognizedTextPanel
@@ -136,6 +136,8 @@ class MainWindow(QMainWindow):
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
         self._recognized_text_panel.ask_requested.connect(self._ask_ai)
+        self._recognized_text_panel.rewrite_requested.connect(self._clear_board)
+        self._recognized_text_panel.google_vision_requested.connect(self._recognize_with_google)
 
     def _recognize_handwriting(self) -> None:
         if self._recognition_in_progress:
@@ -157,7 +159,7 @@ class MainWindow(QMainWindow):
                 "The board changed during recognition. Click Ask AI again."
             )
             return
-        if not isinstance(result, RecognitionResult):
+        if not isinstance(result, OcrResult):
             QMessageBox.critical(self, "Recognition failed", "The recognizer returned an invalid result.")
             return
         if not result.text.strip():
@@ -167,7 +169,12 @@ class MainWindow(QMainWindow):
                 "No readable text was found. Try writing larger and click Ask AI again.",
             )
             return
-        self._recognized_text_panel.set_recognition_result(result)
+        self._recognized_text_panel.set_recognition_result(
+            result,
+            self._recognizer.high_confidence,
+            self._recognizer.medium_confidence,
+            self._recognizer.google_available,
+        )
         self._recognized_revision = revision
 
     def _complete_recognition(self) -> None:
@@ -188,7 +195,37 @@ class MainWindow(QMainWindow):
         if self._recognized_revision != self._canvas.revision:
             self._recognize_handwriting()
             return
+        if not self._recognized_text_panel.can_submit:
+            QMessageBox.warning(
+                self,
+                "Review required",
+                "Recognition confidence is low. Rewrite, use Google Vision OCR, "
+                "or edit the text before sending.",
+            )
+            return
+        if self._recognized_text_panel.confidence_band == "medium":
+            answer = QMessageBox.question(
+                self,
+                "Confirm recognized text",
+                "Some words may be uncertain. Send the reviewed text to EdTalkies?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
         self._submit_question(self._recognized_text_panel.text())
+
+    def _recognize_with_google(self) -> None:
+        if not self._recognizer.google_available:
+            return
+        revision = self._canvas.revision
+        image_bytes = self._canvas.to_png_bytes()
+        self._run_background(
+            "Using Google Vision OCR...",
+            lambda: self._recognizer.recognize_with_google(image_bytes),
+            lambda result: self._display_recognized_text(result, revision),
+            "Google Vision OCR failed",
+        )
 
     def _clear_board(self) -> None:
         self._canvas.clear()

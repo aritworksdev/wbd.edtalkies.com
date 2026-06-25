@@ -28,6 +28,16 @@ def _int_env(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer, got {value!r}.") from exc
 
 
+def _float_env(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number, got {value!r}.") from exc
+
+
 @dataclass(frozen=True)
 class EdTalkiesSettings:
     api_base_url: str
@@ -64,6 +74,14 @@ class AppSettings:
     log_level: str
     edtalkies: EdTalkiesSettings
     local_handwriting_model: str = "microsoft/trocr-base-handwritten"
+    ocr_confidence_high: float = 0.85
+    ocr_confidence_medium: float = 0.65
+    ocr_language: str = "en"
+    tesseract_cmd: str = ""
+    tesseract_language: str = "eng"
+    google_vision_enabled: bool = False
+    google_application_credentials: Path = Path("config/google-vision-service-account.json")
+    google_cloud_project_id: str = ""
 
 
 def load_settings(env_file: str | Path | None = None) -> AppSettings:
@@ -78,6 +96,13 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
     # those installations to real OCR unless mock mode is explicitly allowed.
     if provider == "mock" and not _bool_env("AIBOARD_ALLOW_MOCK_RECOGNIZER", False):
         provider = "local"
+    high_confidence = _float_env("OCR_CONFIDENCE_HIGH", 0.85)
+    medium_confidence = _float_env("OCR_CONFIDENCE_MEDIUM", 0.65)
+    if not 0 <= medium_confidence < high_confidence <= 1:
+        raise ValueError(
+            "OCR confidence thresholds must satisfy "
+            "0 <= OCR_CONFIDENCE_MEDIUM < OCR_CONFIDENCE_HIGH <= 1."
+        )
 
     return AppSettings(
         app_env=os.getenv("AIBOARD_APP_ENV", "production"),
@@ -105,4 +130,17 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             "AIBOARD_LOCAL_HANDWRITING_MODEL",
             "microsoft/trocr-base-handwritten",
         ),
+        ocr_confidence_high=high_confidence,
+        ocr_confidence_medium=medium_confidence,
+        ocr_language=os.getenv("OCR_LANGUAGE", "en"),
+        tesseract_cmd=os.getenv("TESSERACT_CMD", ""),
+        tesseract_language=os.getenv("TESSERACT_LANGUAGE", "eng"),
+        google_vision_enabled=_bool_env("GOOGLE_VISION_ENABLED", False),
+        google_application_credentials=Path(
+            os.getenv(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                "./config/google-vision-service-account.json",
+            )
+        ).expanduser(),
+        google_cloud_project_id=os.getenv("GOOGLE_CLOUD_PROJECT_ID", ""),
     )

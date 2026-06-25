@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from aiboard_app.recognition.ocr_result import OcrResult
 
-
-@dataclass(frozen=True)
-class RecognitionResult:
-    text: str
-    confidence: float | None = None
-    provider: str = "unknown"
+RecognitionResult = OcrResult
 
 
 class OcrProvider(ABC):
     @abstractmethod
-    def recognize(self, image_bytes: bytes) -> RecognitionResult:
+    def recognize(self, image_bytes: bytes) -> OcrResult:
         raise NotImplementedError

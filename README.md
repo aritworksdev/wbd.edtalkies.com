@@ -6,7 +6,8 @@ The app works without API credentials. When `EDTALKIES_API_BASE_URL` is blank, i
 
 ## Install on Windows
 
-Python 3.10 or newer is recommended.
+Python 3.12 (64-bit) is recommended because it is supported by the full local
+OCR stack, including PaddlePaddle.
 
 ```powershell
 python -m venv .venv
@@ -15,6 +16,37 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
+
+### Install PaddleOCR (primary OCR)
+
+In the activated Python 3.12 virtual environment:
+
+```powershell
+pip install -r requirements-ocr-paddle.txt
+```
+
+PaddleOCR downloads its selected models on first use. If PaddlePaddle is not
+available for the active Python version, AiBoard records the provider error and
+continues with TrOCR.
+
+Official references:
+
+- [PaddleOCR installation and Python integration](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/OCR.html)
+- [TrOCR model documentation](https://huggingface.co/docs/transformers/model_doc/trocr)
+
+### Install Tesseract (emergency local fallback)
+
+Install Tesseract 5 for Windows, then configure its executable:
+
+```env
+TESSERACT_CMD=C:/Program Files/Tesseract-OCR/tesseract.exe
+TESSERACT_LANGUAGE=eng
+```
+
+The Python package alone is not enough; the native Tesseract application must
+also be installed.
+
+See the [official Tesseract installation documentation](https://tesseract-ocr.github.io/tessdoc/Installation.html).
 
 ## Run
 
@@ -42,17 +74,18 @@ EDTALKIES_SESSION_ID=
 
 Do not commit `.env`; it is ignored by Git.
 
-Real local handwriting recognition is enabled by default:
+OCR confidence and provider configuration:
 
 ```env
-AIBOARD_HANDWRITING_PROVIDER=local
 AIBOARD_LOCAL_HANDWRITING_MODEL=microsoft/trocr-base-handwritten
+OCR_CONFIDENCE_HIGH=0.85
+OCR_CONFIDENCE_MEDIUM=0.65
+OCR_LANGUAGE=en
 ```
 
-The local provider uses Microsoft's TrOCR handwritten model. On first use it
-downloads the model and caches it on the Windows device; this can take several
-minutes depending on the connection. Later recognition runs from the local
-cache and does not send the board image to an OCR service.
+The local pipeline runs PaddleOCR first, uses Microsoft TrOCR when handwriting
+quality is poor, and uses Tesseract as an emergency local fallback. TrOCR
+downloads and caches its model on first use.
 
 Allow roughly 2 GB of free disk space for Python OCR dependencies and cached
 model files. Recognition runs on the CPU unless the installed PyTorch runtime
@@ -62,20 +95,43 @@ Handwriting OCR is probabilistic and cannot guarantee 100% accuracy for every
 writing style, pen thickness, or symbol. Write in clear horizontal lines and
 review the editable recognized text before submitting it.
 
-For real handwriting conversion through the EdTalkies OCR endpoint:
+### Optional Google Vision fallback
 
 ```env
-AIBOARD_HANDWRITING_PROVIDER=edtalkies
-EDTALKIES_API_BASE_URL=https://your-edtalkies-host.example
-EDTALKIES_OCR_PATH=/api/ocr/handwriting
+GOOGLE_VISION_ENABLED=false
+GOOGLE_APPLICATION_CREDENTIALS=./config/google-vision-service-account.json
+GOOGLE_CLOUD_PROJECT_ID=edtalkies
 ```
 
-Use `edtalkies` to send the board image to the configured EdTalkies OCR
-endpoint. Use `mock` only for UI testing; it does not read handwriting.
+Google Vision is never called automatically. The option is shown only for
+low-confidence results when it is enabled and the credential file exists.
 
-Old `.env` files may still contain `AIBOARD_HANDWRITING_PROVIDER=mock`.
-AiBoard now migrates that value to local OCR unless
-`AIBOARD_ALLOW_MOCK_RECOGNIZER=true` is explicitly configured.
+Copy
+`config/google-vision-service-account.example.json.template` to
+`config/google-vision-service-account.json`, then replace every placeholder
+with values from a Google Cloud service-account key. The real JSON is ignored
+by Git through `config/*.json` and must never be committed.
+
+The credential JSON must contain `type`, `project_id`, `private_key_id`,
+`private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`,
+`auth_provider_x509_cert_url`, `client_x509_cert_url`, and
+`universe_domain`. See the
+[official Google Vision OCR guide](https://cloud.google.com/vision/docs/ocr).
+
+## OCR Confidence Workflow
+
+1. PaddleOCR runs first.
+2. If PaddleOCR is unavailable or below the high-confidence threshold, TrOCR
+   evaluates the handwriting.
+3. If the primary local models fail or remain low confidence, Tesseract runs.
+4. AiBoard selects the strongest local result.
+5. Google Vision is offered only for low-confidence results and only when
+   explicitly enabled with a valid local credential file.
+
+- **85% and above:** normal editable text; **Ask EdTalkies** is enabled.
+- **65%–84%:** uncertain words are highlighted and confirmation is required.
+- **Below 65%:** submission is blocked until the teacher rewrites, edits the
+  text, or explicitly uses Google Vision OCR.
 
 ## Current Features
 
@@ -83,8 +139,9 @@ AiBoard now migrates that value to local OCR unless
 - Pen color and thickness, eraser, clear, undo, redo, and PNG save
 - A two-stage **Ask AI** flow: the first click converts the current board into
   editable text; after review, the second click submits it to the API
-- Real local handwriting OCR with blackboard preprocessing and multiline
-  recognition using TrOCR
+- Confidence-aware OCR pipeline: PaddleOCR → TrOCR → Tesseract
+- Optional, explicit Google Vision fallback for low-confidence recognition
+- Uncertain-word highlighting and editable text before every API submission
 - Keyboard question entry using the same visible review/API flow
 - Background API and download operations so the UI remains responsive
 - Configurable EdTalkies API client with timeout, retries, IDs, and mock mode

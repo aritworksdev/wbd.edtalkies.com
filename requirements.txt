@@ -6,3 +6,5 @@ Pillow>=11,<13
 opencv-python-headless>=4.11,<5
 torch>=2.9,<3
 transformers>=4.57,<5
+pytesseract>=0.3.13,<1
+google-cloud-vision>=3.10,<4
