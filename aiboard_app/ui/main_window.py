@@ -7,7 +7,9 @@ from typing import Any
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QProgressDialog,
@@ -34,6 +36,7 @@ LOGGER = logging.getLogger(__name__)
 class WorkerSignals(QObject):
     succeeded = Signal(object)
     failed = Signal(str)
+    finished = Signal()
 
 
 class BackgroundWorker(QRunnable):
@@ -49,6 +52,8 @@ class BackgroundWorker(QRunnable):
         except Exception as exc:
             LOGGER.exception("Background operation failed")
             self.signals.failed.emit(str(exc))
+        finally:
+            self.signals.finished.emit()
 
 
 class MainWindow(QMainWindow):
@@ -72,6 +77,7 @@ class MainWindow(QMainWindow):
         self._shutdown_manager = shutdown_manager
         self._thread_pool = QThreadPool.globalInstance()
         self._progress: QProgressDialog | None = None
+        self._active_workers: set[BackgroundWorker] = set()
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -81,10 +87,12 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
+        self._header = self._build_header()
         self._toolbar = WhiteboardToolbar()
         self._canvas = WhiteboardCanvas()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
+        self._footer = self._build_footer()
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
@@ -92,8 +100,10 @@ class MainWindow(QMainWindow):
         body.addWidget(self._canvas, 1)
         body.addWidget(self._response_panel)
 
+        root_layout.addWidget(self._header)
         root_layout.addWidget(self._toolbar)
         root_layout.addLayout(body, 1)
+        root_layout.addWidget(self._footer)
         self.setCentralWidget(root)
 
         self._connect_signals()
@@ -228,7 +238,12 @@ class MainWindow(QMainWindow):
         worker = BackgroundWorker(task)
         worker.signals.succeeded.connect(lambda result: self._finish_background(progress, on_success, result))
         worker.signals.failed.connect(lambda error: self._fail_background(progress, error_title, error))
+        worker.signals.finished.connect(lambda: self._release_worker(worker))
+        self._active_workers.add(worker)
         self._thread_pool.start(worker)
+
+    def _release_worker(self, worker: BackgroundWorker) -> None:
+        self._active_workers.discard(worker)
 
     def _finish_background(
         self,
@@ -259,10 +274,49 @@ class MainWindow(QMainWindow):
             return
         event.accept()
 
+    def _build_header(self) -> QFrame:
+        header = QFrame()
+        header.setObjectName("AppHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(20, 10, 20, 10)
+        title = QLabel("EdTalkies Ai Blackboard")
+        title.setObjectName("AppHeaderTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(title)
+        layout.addStretch(1)
+        return header
+
+    def _build_footer(self) -> QFrame:
+        footer = QFrame()
+        footer.setObjectName("AppFooter")
+        layout = QHBoxLayout(footer)
+        layout.setContentsMargins(20, 8, 20, 8)
+        label = QLabel("© AR ITWORKS, LLC")
+        label.setObjectName("AppFooterText")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label, 1)
+        return footer
+
     def _apply_styles(self) -> None:
         self.setStyleSheet(
             """
-            #AiBoardMainWindow { background: #f8fafc; }
+            #AiBoardMainWindow { background: #000000; }
+            #AppHeader, #AppFooter {
+                background: #111827;
+                border: 0;
+            }
+            #AppHeader { border-bottom: 1px solid #374151; }
+            #AppFooter { border-top: 1px solid #374151; }
+            #AppHeaderTitle {
+                color: #ffffff;
+                font-size: 24px;
+                font-weight: 700;
+            }
+            #AppFooterText {
+                color: #d1d5db;
+                font-size: 14px;
+                font-weight: 600;
+            }
             #WhiteboardToolbar {
                 background: #17212f;
                 border-bottom: 1px solid #0f172a;

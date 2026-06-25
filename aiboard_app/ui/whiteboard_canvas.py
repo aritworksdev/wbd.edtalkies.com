@@ -6,18 +6,20 @@ from PySide6.QtWidgets import QWidget
 
 
 class WhiteboardCanvas(QWidget):
+    BOARD_COLOR = QColor("#000000")
+
     def __init__(self) -> None:
         super().__init__()
         self.setAttribute(Qt.WidgetAttribute.WA_StaticContents)
         self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents)
         self.setAutoFillBackground(True)
-        self._pen_color = QColor("#111111")
+        self._pen_color = QColor("#ffffff")
         self._pen_width = 6
         self._eraser = False
         self._drawing = False
         self._last_point = QPoint()
         self._image = QImage(1280, 720, QImage.Format.Format_RGB32)
-        self._image.fill(Qt.GlobalColor.white)
+        self._image.fill(self.BOARD_COLOR)
         self._undo_stack: list[QImage] = []
         self._redo_stack: list[QImage] = []
 
@@ -33,7 +35,7 @@ class WhiteboardCanvas(QWidget):
 
     def clear(self) -> None:
         self._save_undo_state()
-        self._image.fill(Qt.GlobalColor.white)
+        self._image.fill(self.BOARD_COLOR)
         self.update()
 
     def undo(self) -> None:
@@ -70,7 +72,7 @@ class WhiteboardCanvas(QWidget):
         if self.width() == self._image.width() and self.height() == self._image.height():
             return
         new_image = QImage(self.width(), self.height(), QImage.Format.Format_RGB32)
-        new_image.fill(Qt.GlobalColor.white)
+        new_image.fill(self.BOARD_COLOR)
         painter = QPainter(new_image)
         painter.drawImage(QPoint(0, 0), self._image)
         painter.end()
@@ -111,7 +113,7 @@ class WhiteboardCanvas(QWidget):
 
     def _draw_line_to(self, end_point: QPoint) -> None:
         painter = QPainter(self._image)
-        color = QColor(Qt.GlobalColor.white) if self._eraser else self._pen_color
+        color = self.BOARD_COLOR if self._eraser else self._pen_color
         painter.setPen(
             QPen(
                 color,

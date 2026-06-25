@@ -84,6 +84,6 @@ class WhiteboardToolbar(QFrame):
         return button
 
     def _choose_color(self) -> None:
-        color = QColorDialog.getColor(QColor("#111111"), self, "Choose pen color")
+        color = QColorDialog.getColor(QColor("#ffffff"), self, "Choose pen color")
         if color.isValid():
             self.color_changed.emit(color)
