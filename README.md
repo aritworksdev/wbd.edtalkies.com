@@ -22,12 +22,19 @@ Copy-Item .env.example .env
 In the activated Python 3.12 virtual environment:
 
 ```powershell
+python --version
+python -c "import platform; print(platform.architecture()[0]); print(platform.machine())"
 pip install -r requirements-ocr-paddle.txt
 ```
 
 PaddleOCR downloads its selected models on first use. If PaddlePaddle is not
 available for the active Python version, AiBoard records the provider error and
 continues with TrOCR.
+
+PaddlePaddle's official Windows wheels support Python 3.9 through 3.13 and are
+hosted on Paddle's package index rather than the default PyPI index. The
+requirements file includes that official CPU index. Python 3.14 is not
+currently supported.
 
 Official references:
 

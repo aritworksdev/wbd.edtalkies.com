@@ -1,4 +1,5 @@
-# PaddlePaddle currently requires a supported Python version and platform wheel.
-# Use Python 3.12 on 64-bit Windows, then install this file after requirements.txt.
-paddlepaddle>=3.2,<4
+# PaddlePaddle Windows wheels are hosted on Paddle's official package index.
+# Supported Windows Python versions are currently 3.9 through 3.13.
+--extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cpu/
+paddlepaddle==3.3.0
 paddleocr>=3.3,<4
