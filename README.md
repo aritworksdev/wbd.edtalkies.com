@@ -42,13 +42,21 @@ EDTALKIES_SESSION_ID=
 
 Do not commit `.env`; it is ignored by Git.
 
-Choose handwriting recognition with:
+Real local handwriting recognition is enabled by default:
 
 ```env
-AIBOARD_HANDWRITING_PROVIDER=mock
+AIBOARD_HANDWRITING_PROVIDER=local
+AIBOARD_LOCAL_HANDWRITING_MODEL=microsoft/trocr-base-handwritten
 ```
 
-Supported starter values are `mock`, `edtalkies`, and `local`. The latter is intentionally a placeholder for a future on-device recognizer.
+The local provider uses Microsoft's TrOCR handwritten model. On first use it
+downloads the model and caches it on the Windows device; this can take several
+minutes depending on the connection. Later recognition runs from the local
+cache and does not send the board image to an OCR service.
+
+Allow roughly 2 GB of free disk space for Python OCR dependencies and cached
+model files. Recognition runs on the CPU unless the installed PyTorch runtime
+and Windows device support compatible acceleration.
 
 For real handwriting conversion through the EdTalkies OCR endpoint:
 
@@ -58,8 +66,8 @@ EDTALKIES_API_BASE_URL=https://your-edtalkies-host.example
 EDTALKIES_OCR_PATH=/api/ocr/handwriting
 ```
 
-With the `mock` provider, the workflow returns placeholder text so the UI can
-be tested without a configured OCR service.
+Use `edtalkies` to send the board image to the configured EdTalkies OCR
+endpoint. Use `mock` only for UI testing; it does not read handwriting.
 
 ## Current Features
 
@@ -67,6 +75,8 @@ be tested without a configured OCR service.
 - Pen color and thickness, eraser, clear, undo, redo, and PNG save
 - A separate **Handwriting to Text** action that displays recognized text in
   an editable panel before **Ask AI** can submit it
+- Real local handwriting OCR with blackboard preprocessing and multiline
+  recognition using TrOCR
 - Keyboard question entry using the same visible review/API flow
 - Background API and download operations so the UI remains responsive
 - Configurable EdTalkies API client with timeout, retries, IDs, and mock mode

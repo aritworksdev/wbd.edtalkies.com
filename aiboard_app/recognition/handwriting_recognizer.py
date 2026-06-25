@@ -29,7 +29,7 @@ def build_handwriting_recognizer(settings: AppSettings, client: EdTalkiesClient)
     if provider_name == "edtalkies":
         provider: OcrProvider = EdTalkiesOcrProvider(client)
     elif provider_name == "local":
-        provider = LocalOcrProvider()
+        provider = LocalOcrProvider(settings.local_handwriting_model)
     else:
         provider = PlaceholderRecognizer()
     return HandwritingRecognizer(provider)

@@ -63,6 +63,7 @@ class AppSettings:
     confirm_exit: bool
     log_level: str
     edtalkies: EdTalkiesSettings
+    local_handwriting_model: str = "microsoft/trocr-base-handwritten"
 
 
 def load_settings(env_file: str | Path | None = None) -> AppSettings:
@@ -77,7 +78,7 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
         app_env=os.getenv("AIBOARD_APP_ENV", "production"),
         fullscreen=_bool_env("AIBOARD_FULLSCREEN", True),
         export_dir=export_dir,
-        handwriting_provider=os.getenv("AIBOARD_HANDWRITING_PROVIDER", "mock").lower(),
+        handwriting_provider=os.getenv("AIBOARD_HANDWRITING_PROVIDER", "local").lower(),
         exit_action=os.getenv("AIBOARD_EXIT_ACTION", "quit").lower(),
         confirm_exit=_bool_env("AIBOARD_CONFIRM_EXIT", True),
         log_level=os.getenv("AIBOARD_LOG_LEVEL", "INFO").upper(),
@@ -94,5 +95,9 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             board_id=os.getenv("EDTALKIES_BOARD_ID", ""),
             device_id=os.getenv("EDTALKIES_DEVICE_ID", ""),
             session_id=os.getenv("EDTALKIES_SESSION_ID", ""),
+        ),
+        local_handwriting_model=os.getenv(
+            "AIBOARD_LOCAL_HANDWRITING_MODEL",
+            "microsoft/trocr-base-handwritten",
         ),
     )
