@@ -56,6 +56,31 @@ class OcrService:
             raise RuntimeError(message)
         return self._best(candidates).with_pipeline_details(attempts, errors)
 
+    def recognize_document(self, image_bytes: bytes) -> OcrResult:
+        """Printed-document path: PaddleOCR, enhanced Tesseract, then TrOCR."""
+        attempts: list[str] = []
+        errors: list[str] = []
+        candidates: list[OcrResult] = []
+
+        paddle = self._try_document_provider(self._paddle, image_bytes, attempts, errors)
+        if paddle is not None:
+            candidates.append(paddle)
+            if self._confidence(paddle) >= self.high_confidence:
+                return paddle.with_pipeline_details(attempts, errors)
+
+        tesseract = self._try_document_provider(self._tesseract, image_bytes, attempts, errors)
+        if tesseract is not None:
+            candidates.append(tesseract)
+            if self._confidence(tesseract) >= self.high_confidence:
+                return tesseract.with_pipeline_details(attempts, errors)
+
+        trocr = self._try_provider(self._trocr, image_bytes, attempts, errors)
+        if trocr is not None:
+            candidates.append(trocr)
+        if not candidates:
+            raise RuntimeError("; ".join(errors) or "No document OCR provider returned text.")
+        return self._best(candidates).with_pipeline_details(attempts, errors)
+
     def recognize_with_google(self, image_bytes: bytes) -> OcrResult:
         if not self.google_available or self._google is None:
             raise RuntimeError("Google Vision OCR is disabled or credentials are missing.")
@@ -100,6 +125,24 @@ class OcrService:
             result = provider.recognize(image_bytes)
         except Exception as exc:
             LOGGER.warning("%s failed: %s", name, exc)
+            errors.append(f"{name}: {exc}")
+            return None
+        return result if result.text.strip() else None
+
+    @staticmethod
+    def _try_document_provider(
+        provider: OcrProvider,
+        image_bytes: bytes,
+        attempts: list[str],
+        errors: list[str],
+    ) -> OcrResult | None:
+        name = provider.__class__.__name__
+        attempts.append(name)
+        try:
+            recognize_document = getattr(provider, "recognize_document", provider.recognize)
+            result = recognize_document(image_bytes)
+        except Exception as exc:
+            LOGGER.warning("%s document OCR failed: %s", name, exc)
             errors.append(f"{name}: {exc}")
             return None
         return result if result.text.strip() else None

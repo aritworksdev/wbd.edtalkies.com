@@ -20,6 +20,9 @@ class FakeProvider:
             raise self.error
         return self.result
 
+    def recognize_document(self, image_bytes: bytes) -> OcrResult:
+        return self.recognize(image_bytes)
+
 
 def _result(provider: str, confidence: float, text: str = "hello world") -> OcrResult:
     return OcrResult(
@@ -74,6 +77,19 @@ def test_tesseract_runs_when_primary_local_providers_fail() -> None:
 
     assert result.provider == "tesseract"
     assert len(result.errors) == 2
+
+
+def test_document_pipeline_prefers_tesseract_before_trocr() -> None:
+    paddle = FakeProvider(error=RuntimeError("paddle unavailable"))
+    trocr = FakeProvider(_result("trocr", 0.84, "handwriting guess"))
+    tesseract = FakeProvider(_result("tesseract", 0.92, "printed document"))
+    service = OcrService(paddle, trocr, tesseract, None, 0.85, 0.65)
+
+    result = service.recognize_document(b"image")
+
+    assert result.provider == "tesseract"
+    assert tesseract.calls == 1
+    assert trocr.calls == 0
 
 
 def test_google_is_unavailable_without_valid_credentials(tmp_path: Path) -> None:

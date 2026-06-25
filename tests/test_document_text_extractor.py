@@ -14,6 +14,9 @@ class FakeOcrService:
         assert image_bytes
         return OcrResult("recognized image text", 0.88, "fake-ocr")
 
+    def recognize_document(self, image_bytes: bytes) -> OcrResult:
+        return self.recognize(image_bytes)
+
 
 def test_extract_plain_text_document(tmp_path: Path) -> None:
     path = tmp_path / "lesson.txt"

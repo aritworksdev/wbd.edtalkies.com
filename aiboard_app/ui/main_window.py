@@ -249,9 +249,12 @@ class MainWindow(QMainWindow):
             self._recognizer.medium_confidence,
             self._recognizer.google_available and bool(self._google_ocr_sources),
         )
-        self._recognized_text_panel.set_status(
-            f"Extracted from {path.name} using {result.provider}. Review before sending."
-        )
+        local_failures = "; ".join(result.errors)
+        if result.provider == "trocr" and local_failures:
+            self._recognized_text_panel.set_status(
+                f"{path.name}: printed-document OCR providers were unavailable. "
+                "Install PaddleOCR or Tesseract, or use Google Vision OCR."
+            )
         self._recognized_revision = self._canvas.revision
 
     def _ask_ai(self) -> None:

@@ -5,7 +5,7 @@ from typing import Any
 
 from aiboard_app.recognition.ocr_provider_base import OcrProvider
 from aiboard_app.recognition.ocr_result import OcrResult, OcrWord
-from aiboard_app.recognition.image_preprocessor import normalized_color_image
+from aiboard_app.recognition.image_preprocessor import document_variants, normalized_color_image
 
 
 class PaddleOcrProvider(OcrProvider):
@@ -33,6 +33,22 @@ class PaddleOcrProvider(OcrProvider):
             raw = self._engine.ocr(image, cls=True)
             words = self._parse_v2(raw)
         return self._result(words)
+
+    def recognize_document(self, image_bytes: bytes) -> OcrResult:
+        import cv2
+
+        self._load_engine()
+        candidates: list[OcrResult] = []
+        for variant in document_variants(image_bytes):
+            image = cv2.cvtColor(variant, cv2.COLOR_GRAY2BGR)
+            if hasattr(self._engine, "predict"):
+                words = self._parse_v3(list(self._engine.predict(input=image)))
+            else:
+                words = self._parse_v2(self._engine.ocr(image, cls=True))
+            result = self._result(words)
+            if result.text:
+                candidates.append(result)
+        return max(candidates, key=lambda item: item.confidence or 0.0) if candidates else OcrResult.empty("paddleocr")
 
     def _load_engine(self) -> None:
         if self._engine is not None:

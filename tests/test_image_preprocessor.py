@@ -4,7 +4,11 @@ import io
 
 from PIL import Image, ImageDraw
 
-from aiboard_app.recognition.image_preprocessor import dark_text_on_light, decode_grayscale
+from aiboard_app.recognition.image_preprocessor import (
+    dark_text_on_light,
+    decode_grayscale,
+    document_variants,
+)
 
 
 def _png(background: str, foreground: str) -> bytes:
@@ -27,3 +31,10 @@ def test_blackboard_is_inverted_to_document_polarity() -> None:
     normalized = dark_text_on_light(original)
 
     assert normalized[0, 0] > normalized[50, 100]
+
+
+def test_document_variants_upscale_small_images() -> None:
+    variants = document_variants(_png("white", "black"))
+
+    assert len(variants) == 4
+    assert variants[0].shape[1] >= 1800

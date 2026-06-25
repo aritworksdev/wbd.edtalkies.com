@@ -85,6 +85,17 @@ AiBoard automatically detects whether an uploaded image is a normal
 black-text-on-white document or a light-on-dark board image before OCR.
 Mixed PDFs preserve embedded text and OCR only scanned pages.
 
+PNG/JPEG document extraction uses a printed-document pipeline:
+
+1. PaddleOCR
+2. Enhanced Tesseract over multiple contrast/threshold variants
+3. TrOCR only as a final fallback
+
+At least PaddleOCR or the native Tesseract executable should be installed for
+reliable printed PNG extraction. If neither is installed, the UI reports that
+the printed-document providers are unavailable and offers Google Vision when
+configured.
+
 ## Configure EdTalkies
 
 Edit `.env`:

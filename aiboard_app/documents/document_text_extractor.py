@@ -57,7 +57,7 @@ class DocumentTextExtractor:
             )
         image_bytes = path.read_bytes()
         return DocumentExtraction(
-            self._ocr_service.recognize(image_bytes),
+            self._ocr_service.recognize_document(image_bytes),
             (image_bytes,),
         )
 
@@ -88,7 +88,7 @@ class DocumentTextExtractor:
                 pixmap = page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False)
                 image_bytes = pixmap.tobytes("png")
                 page_images.append(image_bytes)
-                results.append(self._ocr_service.recognize(image_bytes))
+                results.append(self._ocr_service.recognize_document(image_bytes))
         provider = "document-pdf" if not page_images else "document-pdf-mixed-ocr"
         return DocumentExtraction(self._combine_ocr_results(results, provider), tuple(page_images))
 

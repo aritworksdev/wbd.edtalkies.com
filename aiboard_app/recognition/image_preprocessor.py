@@ -26,3 +26,30 @@ def normalized_color_image(image_bytes: bytes) -> Any:
 
     gray = dark_text_on_light(decode_grayscale(image_bytes))
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+
+def document_variants(image_bytes: bytes) -> list[Any]:
+    """Create OCR-friendly document variants for screenshots and photos."""
+    import cv2
+
+    gray = dark_text_on_light(decode_grayscale(image_bytes))
+    height, width = gray.shape
+    scale = max(1.0, 1800.0 / max(width, 1))
+    if scale > 1.0:
+        gray = cv2.resize(
+            gray,
+            (int(width * scale), int(height * scale)),
+            interpolation=cv2.INTER_CUBIC,
+        )
+    denoised = cv2.fastNlMeansDenoising(gray, None, 8, 7, 21)
+    contrast = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(denoised)
+    _, otsu = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    adaptive = cv2.adaptiveThreshold(
+        contrast,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        15,
+    )
+    return [gray, contrast, otsu, adaptive]
