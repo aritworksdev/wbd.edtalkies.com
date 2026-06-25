@@ -48,8 +48,52 @@ def test_ask_posts_configured_payload() -> None:
 
     assert result == {"answer": "ok"}
     assert fake_session.url == "https://example.test/m18/query"
-    assert fake_session.payload["text"] == "What is gravity?"
-    assert fake_session.payload["deviceId"] == "device"
+    assert fake_session.payload == {
+        "Channel": "WhatsApp",
+        "Phone": "",
+        "Message": "What is gravity?",
+        "Language": "English",
+        "Source": "SendPulse",
+        "Season": "Any Level",
+        "Genre": "Any Subject",
+        "ContentSource": "Any Curriculum",
+    }
+
+
+def test_ask_allows_quickask_context_overrides() -> None:
+    settings = EdTalkiesSettings(
+        api_base_url="https://example.test",
+        api_key="",
+        ai_query_path="/quick-ask",
+        ocr_path="/ocr",
+        timeout_seconds=3,
+        retry_count=0,
+        model="default",
+        assistant_mode="teacher_board",
+        school_id="",
+        board_id="",
+        device_id="",
+    )
+    client = EdTalkiesClient(settings)
+    fake_session = FakeSession()
+    client._session = fake_session  # type: ignore[attr-defined]
+
+    client.ask(
+        AiQuery(
+            text="Explain photosynthesis",
+            context={
+                "Language": "Hindi",
+                "Season": "Grade 6",
+                "Genre": "Biology",
+                "ContentSource": "CBSE",
+            },
+        )
+    )
+
+    assert fake_session.payload["Language"] == "Hindi"
+    assert fake_session.payload["Season"] == "Grade 6"
+    assert fake_session.payload["Genre"] == "Biology"
+    assert fake_session.payload["ContentSource"] == "CBSE"
 
 
 def test_ask_uses_mock_when_base_url_is_blank() -> None:

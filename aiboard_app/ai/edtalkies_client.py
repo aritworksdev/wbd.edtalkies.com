@@ -34,15 +34,18 @@ class EdTalkiesClient:
         if not self._settings.is_configured:
             return self._mock_response(query.text)
 
+        context = query.context or {}
         payload = {
-            "text": query.text,
-            "model": self._settings.model,
-            "assistantMode": self._settings.assistant_mode,
-            "schoolId": self._settings.school_id,
-            "boardId": self._settings.board_id,
-            "deviceId": self._settings.device_id,
-            "sessionId": self._settings.session_id,
-            "context": query.context or {},
+            "Channel": str(context.get("Channel") or self._settings.quick_ask_channel),
+            "Phone": str(context.get("Phone") or self._settings.quick_ask_phone),
+            "Message": query.text.strip(),
+            "Language": str(context.get("Language") or self._settings.quick_ask_language),
+            "Source": str(context.get("Source") or self._settings.quick_ask_source),
+            "Season": str(context.get("Season") or self._settings.quick_ask_season),
+            "Genre": str(context.get("Genre") or self._settings.quick_ask_genre),
+            "ContentSource": str(
+                context.get("ContentSource") or self._settings.quick_ask_content_source
+            ),
         }
         return self._post_json(self._settings.ai_query_path, payload)
 

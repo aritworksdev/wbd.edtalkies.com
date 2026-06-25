@@ -114,18 +114,41 @@ configured.
 Edit `.env`:
 
 ```env
-EDTALKIES_API_BASE_URL=https://your-edtalkies-host.example
-EDTALKIES_API_KEY=your-secret-key
-EDTALKIES_AI_QUERY_PATH=/api/ai/query
+EDTALKIES_API_BASE_URL=https://ramovies.app/edtalkies
+EDTALKIES_API_KEY=
+EDTALKIES_AI_QUERY_PATH=/api/AiBotTalkies/QuickAskAiTeacherAsync
 EDTALKIES_OCR_PATH=/api/ocr/handwriting
 EDTALKIES_TIMEOUT_SECONDS=30
 EDTALKIES_RETRY_COUNT=2
-EDTALKIES_DEVICE_ID=board-01
-EDTALKIES_SCHOOL_ID=school-01
-EDTALKIES_SESSION_ID=
+EDTALKIES_QUICKASK_CHANNEL=WhatsApp
+EDTALKIES_QUICKASK_PHONE=
+EDTALKIES_QUICKASK_LANGUAGE=English
+EDTALKIES_QUICKASK_SOURCE=SendPulse
+EDTALKIES_QUICKASK_SEASON=Any Level
+EDTALKIES_QUICKASK_GENRE=Any Subject
+EDTALKIES_QUICKASK_CONTENT_SOURCE=Any Curriculum
 ```
 
 Do not commit `.env`; it is ignored by Git.
+
+The QuickAsk integration sends:
+
+```json
+{
+  "Channel": "WhatsApp",
+  "Phone": "",
+  "Message": "The reviewed teacher question",
+  "Language": "English",
+  "Source": "SendPulse",
+  "Season": "Any Level",
+  "Genre": "Any Subject",
+  "ContentSource": "Any Curriculum"
+}
+```
+
+The request and response contracts are isolated in
+`aiboard_app/ai/edtalkies_client.py` and
+`aiboard_app/ai/response_parser.py`.
 
 OCR confidence and provider configuration:
 

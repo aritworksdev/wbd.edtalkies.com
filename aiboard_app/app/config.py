@@ -52,6 +52,13 @@ class EdTalkiesSettings:
     board_id: str
     device_id: str
     session_id: str = ""
+    quick_ask_channel: str = "WhatsApp"
+    quick_ask_phone: str = ""
+    quick_ask_language: str = "English"
+    quick_ask_source: str = "SendPulse"
+    quick_ask_season: str = "Any Level"
+    quick_ask_genre: str = "Any Subject"
+    quick_ask_content_source: str = "Any Curriculum"
 
     @property
     def is_configured(self) -> bool:
@@ -122,9 +129,15 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
         confirm_exit=_bool_env("AIBOARD_CONFIRM_EXIT", True),
         log_level=os.getenv("AIBOARD_LOG_LEVEL", "INFO").upper(),
         edtalkies=EdTalkiesSettings(
-            api_base_url=os.getenv("EDTALKIES_API_BASE_URL", ""),
+            api_base_url=os.getenv(
+                "EDTALKIES_API_BASE_URL",
+                "https://ramovies.app/edtalkies",
+            ),
             api_key=os.getenv("EDTALKIES_API_KEY", ""),
-            ai_query_path=os.getenv("EDTALKIES_AI_QUERY_PATH", "/api/ai/query"),
+            ai_query_path=os.getenv(
+                "EDTALKIES_AI_QUERY_PATH",
+                "/api/AiBotTalkies/QuickAskAiTeacherAsync",
+            ),
             ocr_path=os.getenv("EDTALKIES_OCR_PATH", "/api/ocr/handwriting"),
             timeout_seconds=_int_env("EDTALKIES_TIMEOUT_SECONDS", 30),
             retry_count=_int_env("EDTALKIES_RETRY_COUNT", 2),
@@ -134,6 +147,16 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             board_id=os.getenv("EDTALKIES_BOARD_ID", ""),
             device_id=os.getenv("EDTALKIES_DEVICE_ID", ""),
             session_id=os.getenv("EDTALKIES_SESSION_ID", ""),
+            quick_ask_channel=os.getenv("EDTALKIES_QUICKASK_CHANNEL", "WhatsApp"),
+            quick_ask_phone=os.getenv("EDTALKIES_QUICKASK_PHONE", ""),
+            quick_ask_language=os.getenv("EDTALKIES_QUICKASK_LANGUAGE", "English"),
+            quick_ask_source=os.getenv("EDTALKIES_QUICKASK_SOURCE", "SendPulse"),
+            quick_ask_season=os.getenv("EDTALKIES_QUICKASK_SEASON", "Any Level"),
+            quick_ask_genre=os.getenv("EDTALKIES_QUICKASK_GENRE", "Any Subject"),
+            quick_ask_content_source=os.getenv(
+                "EDTALKIES_QUICKASK_CONTENT_SOURCE",
+                "Any Curriculum",
+            ),
         ),
         local_handwriting_model=os.getenv(
             "AIBOARD_LOCAL_HANDWRITING_MODEL",
