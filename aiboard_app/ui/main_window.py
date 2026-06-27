@@ -412,6 +412,7 @@ class MainWindow(QMainWindow):
         is_busy = self._busy_count > 0
         self._toolbar.set_busy(is_busy)
         self._recognized_text_panel.set_busy(is_busy, message)
+        self._canvas.set_processing_animation(is_busy)
         self._canvas.setEnabled(not is_busy)
         QApplication.processEvents()
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, Qt, Signal
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPen, QTabletEvent
 from PySide6.QtWidgets import QWidget
 
@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QWidget
 class WhiteboardCanvas(QWidget):
     content_changed = Signal(int)
     BOARD_COLOR = QColor("#000000")
+    BORDER_WIDTH = 5
+    BORDER_COLOR = QColor("#8B7500")
 
     def __init__(self) -> None:
         super().__init__()
@@ -24,6 +26,11 @@ class WhiteboardCanvas(QWidget):
         self._undo_stack: list[QImage] = []
         self._redo_stack: list[QImage] = []
         self._revision = 0
+        self._animated_border = False
+        self._border_hue = 0
+        self._border_timer = QTimer(self)
+        self._border_timer.setInterval(70)
+        self._border_timer.timeout.connect(self._advance_border_animation)
 
     @property
     def revision(self) -> int:
@@ -38,6 +45,17 @@ class WhiteboardCanvas(QWidget):
 
     def set_eraser(self, enabled: bool) -> None:
         self._eraser = enabled
+
+    def set_processing_animation(self, enabled: bool) -> None:
+        if self._animated_border == enabled:
+            return
+        self._animated_border = enabled
+        if enabled:
+            self._border_timer.start()
+        else:
+            self._border_timer.stop()
+            self._border_hue = 0
+        self.update()
 
     def clear(self) -> None:
         self._save_undo_state()
@@ -74,6 +92,7 @@ class WhiteboardCanvas(QWidget):
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
         painter.drawImage(QPoint(0, 0), self._image)
+        self._draw_border(painter)
 
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if self.width() <= 0 or self.height() <= 0:
@@ -155,3 +174,23 @@ class WhiteboardCanvas(QWidget):
     def _notify_content_changed(self) -> None:
         self._revision += 1
         self.content_changed.emit(self._revision)
+
+    def _advance_border_animation(self) -> None:
+        self._border_hue = (self._border_hue + 8) % 360
+        self.update()
+
+    def _draw_border(self, painter: QPainter) -> None:
+        color = (
+            QColor.fromHsv(self._border_hue, 255, 255)
+            if self._animated_border
+            else self.BORDER_COLOR
+        )
+        half_width = self.BORDER_WIDTH // 2
+        border_rect = QRect(self.rect()).adjusted(
+            half_width,
+            half_width,
+            -half_width - 1,
+            -half_width - 1,
+        )
+        painter.setPen(QPen(color, self.BORDER_WIDTH))
+        painter.drawRect(border_rect)
