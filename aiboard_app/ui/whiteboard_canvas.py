@@ -1,7 +1,16 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPen, QTabletEvent
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import (
+    QColor,
+    QConicalGradient,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QTabletEvent,
+)
 from PySide6.QtWidgets import QWidget
 
 
@@ -9,7 +18,8 @@ class WhiteboardCanvas(QWidget):
     content_changed = Signal(int)
     BOARD_COLOR = QColor("#000000")
     BORDER_WIDTH = 5
-    BORDER_COLOR = QColor("#8B7500")
+    BORDER_COLOR = QColor("#e5e5e5")
+    BORDER_RADIUS = 24
 
     def __init__(self) -> None:
         super().__init__()
@@ -91,7 +101,22 @@ class WhiteboardCanvas(QWidget):
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        board_path = QPainterPath()
+        board_path.addRoundedRect(
+            QRectF(self.rect()).adjusted(
+                self.BORDER_WIDTH / 2,
+                self.BORDER_WIDTH / 2,
+                -self.BORDER_WIDTH / 2,
+                -self.BORDER_WIDTH / 2,
+            ),
+            self.BORDER_RADIUS,
+            self.BORDER_RADIUS,
+        )
+        painter.save()
+        painter.setClipPath(board_path)
         painter.drawImage(QPoint(0, 0), self._image)
+        painter.restore()
         self._draw_border(painter)
 
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
@@ -176,21 +201,31 @@ class WhiteboardCanvas(QWidget):
         self.content_changed.emit(self._revision)
 
     def _advance_border_animation(self) -> None:
-        self._border_hue = (self._border_hue + 8) % 360
+        self._border_hue = (self._border_hue + 6) % 360
         self.update()
 
     def _draw_border(self, painter: QPainter) -> None:
-        color = (
-            QColor.fromHsv(self._border_hue, 255, 255)
-            if self._animated_border
-            else self.BORDER_COLOR
+        border_rect = QRectF(self.rect()).adjusted(
+            self.BORDER_WIDTH / 2,
+            self.BORDER_WIDTH / 2,
+            -self.BORDER_WIDTH / 2,
+            -self.BORDER_WIDTH / 2,
         )
-        half_width = self.BORDER_WIDTH // 2
-        border_rect = QRect(self.rect()).adjusted(
-            half_width,
-            half_width,
-            -half_width - 1,
-            -half_width - 1,
-        )
-        painter.setPen(QPen(color, self.BORDER_WIDTH))
-        painter.drawRect(border_rect)
+        if self._animated_border:
+            gradient = QConicalGradient(border_rect.center(), self._border_hue)
+            gradient.setColorAt(0.00, QColor("#ff0000"))
+            gradient.setColorAt(0.14, QColor("#ffa500"))
+            gradient.setColorAt(0.28, QColor("#ffff00"))
+            gradient.setColorAt(0.42, QColor("#00ff00"))
+            gradient.setColorAt(0.56, QColor("#00ffff"))
+            gradient.setColorAt(0.70, QColor("#0000ff"))
+            gradient.setColorAt(0.84, QColor("#8f00ff"))
+            gradient.setColorAt(1.00, QColor("#ff0000"))
+            pen = QPen(gradient, self.BORDER_WIDTH)
+        else:
+            pen = QPen(self.BORDER_COLOR, self.BORDER_WIDTH)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(border_rect, self.BORDER_RADIUS, self.BORDER_RADIUS)

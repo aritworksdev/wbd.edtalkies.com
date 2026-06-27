@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -97,14 +99,15 @@ class MainWindow(QMainWindow):
         self._header = self._build_header()
         self._toolbar = WhiteboardToolbar()
         self._canvas = WhiteboardCanvas()
+        self._apply_blackboard_shadow()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
         self._recognized_text_panel = RecognizedTextPanel()
         self._footer = self._build_footer()
 
         body = QHBoxLayout()
-        body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(0)
+        body.setContentsMargins(12, 10, 12, 10)
+        body.setSpacing(10)
         body.addWidget(self._canvas, 1)
         body.addWidget(self._response_panel)
 
@@ -437,12 +440,23 @@ class MainWindow(QMainWindow):
         header.setObjectName("AppHeader")
         layout = QHBoxLayout(header)
         layout.setContentsMargins(20, 10, 20, 10)
+        logo = QLabel("e")
+        logo.setObjectName("AppHeaderLogo")
+        logo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         title = QLabel("EdTalkies Ai Blackboard")
         title.setObjectName("AppHeaderTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(logo)
         layout.addWidget(title)
         layout.addStretch(1)
         return header
+
+    def _apply_blackboard_shadow(self) -> None:
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(0, 0, 0, 90))
+        self._canvas.setGraphicsEffect(shadow)
 
     def _build_footer(self) -> QFrame:
         footer = QFrame()
@@ -469,6 +483,20 @@ class MainWindow(QMainWindow):
                 color: #ffffff;
                 font-size: 24px;
                 font-weight: 700;
+            }
+            #AppHeaderLogo {
+                line-height: 0.6;
+                border-right-style: solid;
+                border-right-width: 0px;
+                border-right-color: cornflowerblue;
+                font-family: Poppins, Arial, sans-serif;
+                font-size: 30px;
+                font-weight: 1000;
+                color: white;
+                padding: 0px;
+                margin: 0px;
+                text-decoration: underline;
+                text-decoration-thickness: 1px;
             }
             #AppFooterText {
                 color: #d1d5db;
@@ -514,12 +542,14 @@ class MainWindow(QMainWindow):
                 font-size: 13px;
             }
             #RecognizedTextEditor {
-                background: #f9fafb;
-                color: #111827;
-                border: 1px solid #6b7280;
-                border-radius: 6px;
-                padding: 6px;
+                background: #000000;
+                color: #ffffff;
+                border: 1px solid #ffffff;
+                border-radius: 25px;
+                padding: 10px 16px;
                 font-size: 18px;
+                selection-background-color: #2563eb;
+                selection-color: #ffffff;
             }
             #RecognizedTextPanel QPushButton {
                 min-height: 34px;
