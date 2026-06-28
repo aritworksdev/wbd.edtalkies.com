@@ -13,6 +13,7 @@ ICON_DIR = Path(__file__).resolve().parents[2] / "Assets" / "Icons"
 class IconName:
     ASK_AI = "__ed_icon_ai2.png"
     CLOSE = "__ed_icon_close_window.png"
+    COLOR_WHEEL = "__ed_icon_color_wheel.png"
     CONSOLE = "__ed_icon_console.png"
     DELETE = "__ed_icon_delete.png"
     DOCX = "__db_icon_docx.png"

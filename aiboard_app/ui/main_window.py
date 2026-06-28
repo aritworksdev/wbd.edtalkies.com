@@ -169,8 +169,8 @@ class MainWindow(QMainWindow):
         )
         root_layout.setSpacing(0)
 
-        self._header = self._build_header()
         self._toolbar = WhiteboardToolbar()
+        self._header = self._build_header()
         self._canvas = WhiteboardCanvas()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
@@ -189,7 +189,6 @@ class MainWindow(QMainWindow):
         body.addWidget(self._chat_history_panel)
 
         root_layout.addWidget(self._header)
-        root_layout.addWidget(self._toolbar)
         root_layout.addLayout(body, 1)
         root_layout.addWidget(self._footer)
         self.setCentralWidget(root)
@@ -615,6 +614,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(logo)
         layout.addWidget(title)
         layout.addStretch(1)
+        layout.addWidget(self._toolbar, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return header
 
     def _build_console_panel(self) -> tuple[QFrame, QPlainTextEdit]:

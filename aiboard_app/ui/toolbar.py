@@ -34,8 +34,8 @@ class WhiteboardToolbar(QFrame):
         self._icon_buttons: list[QPushButton] = []
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 8, 14, 8)
-        layout.setSpacing(14)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         self._tool_group = QButtonGroup(self)
         self._tool_group.setExclusive(True)
@@ -52,14 +52,14 @@ class WhiteboardToolbar(QFrame):
         self._tool_group.addButton(pen_button)
         self._tool_group.addButton(eraser_button)
 
-        color_button = self._button(IconName.EDIT, "Choose pen color")
+        color_button = self._button(IconName.COLOR_WHEEL, "Choose pen color")
         color_button.clicked.connect(self._choose_color)
 
         width_slider = QSlider(Qt.Orientation.Horizontal)
         width_slider.setMinimum(2)
         width_slider.setMaximum(24)
         width_slider.setValue(6)
-        width_slider.setFixedWidth(140)
+        width_slider.setFixedWidth(120)
         width_slider.valueChanged.connect(self.width_changed.emit)
 
         actions = [
@@ -81,7 +81,6 @@ class WhiteboardToolbar(QFrame):
         layout.addWidget(width_slider)
         for widget in actions[3:]:
             layout.addWidget(widget)
-        layout.addStretch(1)
         self._apply_responsive_icon_size()
 
     def _button(
@@ -122,11 +121,11 @@ class WhiteboardToolbar(QFrame):
     def _apply_responsive_icon_size(self) -> None:
         width = self.window().width() if self.window() else self.width()
         if width >= 1800:
-            icon_size, touch_size = 44, 58
+            icon_size, touch_size = 44, 56
         elif width >= 1200:
-            icon_size, touch_size = 34, 48
+            icon_size, touch_size = 34, 46
         else:
-            icon_size, touch_size = 26, 40
+            icon_size, touch_size = 26, 38
         size = QSize(icon_size, icon_size)
         for button in self._icon_buttons:
             button.setIconSize(size)

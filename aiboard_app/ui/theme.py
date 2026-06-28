@@ -71,8 +71,8 @@ class EdTalkiesTheme:
             font-weight: 600;
         }}
         #WhiteboardToolbar {{
-            background: rgba(0, 0, 80, 0.28);
-            border-bottom: 1px solid {cls.PANEL_LINE};
+            background: transparent;
+            border: 0;
         }}
         #WhiteboardToolbar QPushButton {{
             background: transparent;
