@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from aiboard_app.ai.response_parser import ParsedResponse
 from aiboard_app.chat.chat_record import ChatRecord
+from aiboard_app.ui.theme import EdTalkiesTheme
 
 try:
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -39,11 +40,11 @@ class ResponsePanel(QFrame):
         header = QHBoxLayout()
         self._title = QLabel("EdTalkies Response")
         self._title.setObjectName("ResponseTitle")
-        close_button = QPushButton("Close")
+        close_button = QPushButton("✕ Close")
         close_button.clicked.connect(self.close_requested.emit)
-        copy_button = QPushButton("Copy")
+        copy_button = QPushButton("⧉ Copy")
         copy_button.clicked.connect(self._copy_response)
-        save_button = QPushButton("Save")
+        save_button = QPushButton("💾 Save")
         save_button.clicked.connect(self._save_response)
         header.addWidget(self._title, 1)
         header.addWidget(copy_button)
@@ -65,9 +66,9 @@ class ResponsePanel(QFrame):
         self._exports = QHBoxLayout()
         export_label = QLabel("Export:")
         export_label.setObjectName("ResponseExportLabel")
-        self._pdf_button = QPushButton("PDF")
-        self._docx_button = QPushButton("Word / DOCX")
-        self._txt_button = QPushButton("Text")
+        self._pdf_button = QPushButton("▣ PDF")
+        self._docx_button = QPushButton("▤ Word / DOCX")
+        self._txt_button = QPushButton("☰ Text")
         self._pdf_button.clicked.connect(lambda: self.export_requested.emit("pdf"))
         self._docx_button.clicked.connect(lambda: self.export_requested.emit("docx"))
         self._txt_button.clicked.connect(lambda: self.export_requested.emit("txt"))
@@ -182,13 +183,14 @@ class ResponsePanel(QFrame):
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
-    body {{ font-family: Arial, sans-serif; font-size: 22px; line-height: 1.45; color: #1f2933; }}
-    .chat-meta {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }}
+    body {{ font-family: {EdTalkiesTheme.FONT_BODY}; font-size: 22px; line-height: 1.5; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
+    .chat-meta {{ background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid {EdTalkiesTheme.PURPLE}; border-radius: 12px; padding: 12px; margin-bottom: 16px; }}
     .chat-meta h3 {{ margin-bottom: 6px; }}
     table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
     th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
     th {{ background: #eef2f7; }}
-    code, pre {{ background: #f1f5f9; border-radius: 4px; padding: 2px 5px; }}
+    code, pre {{ background: #eef2ff; border-radius: 4px; padding: 2px 5px; }}
+    a {{ color: {EdTalkiesTheme.BLUE}; }}
     img {{ max-width: 100%; height: auto; }}
   </style>
 </head>

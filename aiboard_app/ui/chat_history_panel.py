@@ -48,5 +48,5 @@ class ChatHistoryPanel(QFrame):
         created = record.created_at.strftime("%m/%d/%Y %I:%M %p")
         response = record.response_preview
         if response:
-            return f"{record.title}\n{created}\n{response}"
-        return f"{record.title}\n{created}"
+            return f"💬 {record.title}\n{created}\n{response}"
+        return f"💬 {record.title}\n{created}"

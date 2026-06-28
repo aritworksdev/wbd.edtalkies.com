@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QPlainTextEdit, QVBoxLayout
 
+from aiboard_app.ui.theme import EdTalkiesTheme
+
 
 class RecognitionConfirmDialog(QDialog):
     def __init__(
@@ -13,6 +15,7 @@ class RecognitionConfirmDialog(QDialog):
         proceed_label: str = "OK",
     ) -> None:
         super().__init__(parent)
+        self.setStyleSheet(EdTalkiesTheme.app_stylesheet())
         self.setWindowTitle(title)
         self.setMinimumSize(680, 420)
 

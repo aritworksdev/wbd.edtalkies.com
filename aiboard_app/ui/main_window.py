@@ -37,6 +37,7 @@ from aiboard_app.system.shutdown_manager import ShutdownManager
 from aiboard_app.ui.chat_history_panel import ChatHistoryPanel
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
 from aiboard_app.ui.response_panel import ResponsePanel
+from aiboard_app.ui.theme import EdTalkiesTheme
 from aiboard_app.ui.toolbar import WhiteboardToolbar
 from aiboard_app.ui.whiteboard_canvas import WhiteboardCanvas
 
@@ -639,114 +640,11 @@ class MainWindow(QMainWindow):
         footer.setObjectName("AppFooter")
         layout = QHBoxLayout(footer)
         layout.setContentsMargins(20, 8, 20, 8)
-        label = QLabel("\u00a9 AR ITWORKS, LLC")
+        label = QLabel("Powered by EdTalkies AI  •  © AR ITWORKS, LLC")
         label.setObjectName("AppFooterText")
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(label, 1)
         return footer
 
     def _apply_styles(self) -> None:
-        self.setStyleSheet(
-            """
-            #AppRoot { background: #000000; }
-            #AiBoardMainWindow { background: #000000; }
-            #AppHeader, #AppFooter {
-                background: #111827;
-                border: 0;
-            }
-            #AppHeader { border-bottom: 1px solid #374151; }
-            #AppFooter { border-top: 1px solid #374151; }
-            #AppHeaderTitle {
-                color: #ffffff;
-                font-size: 24px;
-                font-weight: 700;
-            }
-            #AppHeaderLogo {
-                line-height: 0.6;
-                border-right-style: solid;
-                border-right-width: 0px;
-                border-right-color: cornflowerblue;
-                font-family: Poppins, Arial, sans-serif;
-                font-size: 34px;
-                font-weight: 1000;
-                color: white;
-                padding: 0px;
-                margin: 0px;
-                text-decoration: underline;
-                text-decoration-thickness: 1px;
-            }
-            #AppFooterText {
-                color: #d1d5db;
-                font-size: 14px;
-                font-weight: 600;
-            }
-            #WhiteboardToolbar {
-                background: #17212f;
-                border-bottom: 1px solid #0f172a;
-            }
-            #WhiteboardToolbar QPushButton {
-                background: #f8fafc;
-                color: #111827;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 8px 12px;
-                font-size: 16px;
-            }
-            #WhiteboardToolbar QPushButton:checked {
-                background: #b8e986;
-                border-color: #5fa041;
-            }
-            #ResponsePanel {
-                background: #ffffff;
-                border-left: 1px solid #cbd5e1;
-            }
-            #ResponseTitle {
-                font-size: 22px;
-                font-weight: 700;
-                color: #111827;
-            }
-            #ConsoleLogPanel {
-                background: #0b1220;
-                border-left: 1px solid #1f2937;
-            }
-            #ConsoleLogTitle {
-                color: #ffffff;
-                font-size: 18px;
-                font-weight: 700;
-            }
-            #ConsoleLogOutput {
-                background: #030712;
-                color: #d1d5db;
-                border: 1px solid #374151;
-                border-radius: 10px;
-                padding: 8px;
-                font-family: Consolas, "Courier New", monospace;
-                font-size: 12px;
-            }
-            #ChatHistoryPanel {
-                background: #0f172a;
-                border-left: 1px solid #1f2937;
-            }
-            #ChatHistoryTitle {
-                color: #ffffff;
-                font-size: 18px;
-                font-weight: 700;
-            }
-            #ChatHistoryList {
-                background: #111827;
-                color: #e5e7eb;
-                border: 1px solid #374151;
-                border-radius: 8px;
-                padding: 4px;
-                font-size: 13px;
-            }
-            #ChatHistoryList::item {
-                border-bottom: 1px solid #273244;
-                padding: 8px;
-            }
-            #ChatHistoryList::item:selected {
-                background: #2563eb;
-                color: #ffffff;
-            }
-            """
-        )
+        self.setStyleSheet(EdTalkiesTheme.app_stylesheet())
