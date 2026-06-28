@@ -100,7 +100,9 @@ class WhiteboardCanvas(QWidget):
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self._animated_border:
+            painter.drawImage(QPoint(0, 0), self._image)
+            return
         board_path = QPainterPath()
         board_path.addRoundedRect(
             QRectF(self.rect()).adjusted(
@@ -112,6 +114,7 @@ class WhiteboardCanvas(QWidget):
             self.BORDER_RADIUS,
             self.BORDER_RADIUS,
         )
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.save()
         painter.setClipPath(board_path)
         painter.drawImage(QPoint(0, 0), self._image)

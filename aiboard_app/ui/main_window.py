@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -22,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aiboard_app.ai.edtalkies_client import AiQuery, EdTalkiesClient, EdTalkiesError
+from aiboard_app.ai.edtalkies_client import AiQuery, EdTalkiesClient
 from aiboard_app.ai.prompt_builder import PromptBuilder
 from aiboard_app.ai.response_parser import ResponseParser
 from aiboard_app.app.config import AppSettings
@@ -31,7 +29,7 @@ from aiboard_app.documents.document_text_extractor import DocumentExtraction
 from aiboard_app.recognition.handwriting_recognizer import HandwritingRecognizer
 from aiboard_app.recognition.ocr_result import OcrResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
-from aiboard_app.ui.recognized_text_panel import RecognizedTextPanel
+from aiboard_app.ui.dialogs import RecognitionConfirmDialog
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.toolbar import WhiteboardToolbar
 from aiboard_app.ui.whiteboard_canvas import WhiteboardCanvas
@@ -102,18 +100,15 @@ class MainWindow(QMainWindow):
         self._header = self._build_header()
         self._toolbar = WhiteboardToolbar()
         self._canvas = WhiteboardCanvas()
-        self._apply_blackboard_shadow()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
-        self._recognized_text_panel = RecognizedTextPanel()
-        self._recognized_text_panel.hide()
         self._console_panel, self._console_output = self._build_console_panel()
         self._console_panel.hide()
         self._footer = self._build_footer()
 
         body = QHBoxLayout()
-        body.setContentsMargins(12, 10, 12, 10)
-        body.setSpacing(10)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
         body.addWidget(self._canvas, 1)
         body.addWidget(self._response_panel)
         body.addWidget(self._console_panel)
@@ -121,7 +116,6 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self._header)
         root_layout.addWidget(self._toolbar)
         root_layout.addLayout(body, 1)
-        root_layout.addWidget(self._recognized_text_panel)
         root_layout.addWidget(self._footer)
         self.setCentralWidget(root)
 
@@ -153,8 +147,6 @@ class MainWindow(QMainWindow):
         self._response_panel.close_requested.connect(self._response_panel.hide)
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
-        self._recognized_text_panel.rewrite_requested.connect(self._clear_board)
-        self._recognized_text_panel.google_vision_requested.connect(self._recognize_with_google)
 
     def _recognize_handwriting(self) -> None:
         if self._recognition_in_progress:
@@ -171,30 +163,6 @@ class MainWindow(QMainWindow):
             "Recognition failed",
             on_complete=self._complete_recognition,
         )
-
-    def _display_recognized_text(self, result: object, revision: int) -> None:
-        if revision != self._canvas.revision:
-            self._recognized_text_panel.set_status(
-                "The board changed during recognition. Click Ask AI again."
-            )
-            return
-        if not isinstance(result, OcrResult):
-            QMessageBox.critical(self, "Recognition failed", "The recognizer returned an invalid result.")
-            return
-        if not result.text.strip():
-            QMessageBox.information(
-                self,
-                "No handwriting recognized",
-                "No readable text was found. Try writing larger and click Ask AI again.",
-            )
-            return
-        self._recognized_text_panel.set_recognition_result(
-            result,
-            self._recognizer.high_confidence,
-            self._recognizer.medium_confidence,
-            self._recognizer.google_available,
-        )
-        self._recognized_revision = revision
 
     def _submit_recognized_text(self, result: object, revision: int) -> None:
         if revision != self._canvas.revision:
@@ -221,20 +189,50 @@ class MainWindow(QMainWindow):
                 "No readable text was found. Try writing larger and click Ask AI again.",
             )
             return
-        self._current_input_text = text
+        confirmed_text = self._confirm_recognized_text(text)
+        if confirmed_text is None:
+            self._log_console("Ask AI cancelled after OCR confirmation.")
+            return
+        self._current_input_text = confirmed_text
         self._recognized_revision = revision
-        self._submit_question(text)
+        self._submit_question(confirmed_text)
+
+    def _confirm_recognized_text(self, text: str) -> str | None:
+        dialog = RecognitionConfirmDialog(
+            text,
+            self,
+            title="Confirm recognized text",
+            instructions="I recognized the following text. Do you want to send this to EdTalkies AI?",
+            proceed_label="Proceed",
+        )
+        if dialog.exec() != RecognitionConfirmDialog.DialogCode.Accepted:
+            return None
+        return dialog.text()
 
     def _complete_recognition(self) -> None:
         self._recognition_in_progress = False
 
     def _keyboard_question(self) -> None:
         self._input_mode = "keyboard"
-        self._recognized_text_panel.show()
-        self._recognized_text_panel.set_text(self._current_input_text, "keyboard")
-        self._recognized_revision = self._canvas.revision
         self._google_ocr_sources = ()
         self._log_console("Keyboard mode selected.")
+        dialog = RecognitionConfirmDialog(
+            self._current_input_text,
+            self,
+            title="Type a question",
+            instructions="Type the question to send to EdTalkies AI.",
+            proceed_label="Proceed",
+        )
+        if dialog.exec() != RecognitionConfirmDialog.DialogCode.Accepted:
+            self._log_console("Keyboard input cancelled.")
+            return
+        text = dialog.text()
+        if not text:
+            QMessageBox.information(self, "No text", "Please type a question before sending.")
+            return
+        self._current_input_text = text
+        self._recognized_revision = self._canvas.revision
+        self._submit_question(text)
 
     def _upload_document(self) -> None:
         file_name, _ = QFileDialog.getOpenFileName(
@@ -251,7 +249,6 @@ class MainWindow(QMainWindow):
         if not file_name:
             return
         path = Path(file_name)
-        self._hide_keyboard_panel()
         self._input_mode = "document"
         self._log_console(f"Document extraction started: {path.name}.")
         self._run_background(
@@ -280,8 +277,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Extraction error", "The document OCR result is invalid.")
             return
         self._google_ocr_sources = extraction.google_vision_images
-        google_available = self._recognizer.google_available and bool(self._google_ocr_sources)
-        if not result.text.strip() and not google_available:
+        if not result.text.strip():
             self._log_console(f"Document extraction completed with no readable text: {path.name}.")
             QMessageBox.warning(
                 self,
@@ -294,43 +290,14 @@ class MainWindow(QMainWindow):
             f"Document extraction completed: {path.name}; "
             f"OCR {result.model_name or result.provider}; confidence {(result.confidence or 0.0):.0%}."
         )
-        self._recognized_text_panel.set_recognition_result(
-            result,
-            self._recognizer.high_confidence,
-            self._recognizer.medium_confidence,
-            google_available,
-        )
         self._recognized_revision = self._canvas.revision
 
     def _ask_ai(self) -> None:
-        if self._input_mode == "keyboard" and self._recognized_text_panel.isVisible():
-            text = self._recognized_text_panel.text()
-            if not text:
-                QMessageBox.information(self, "No text", "Please type a question before sending.")
-                return
-            self._current_input_text = text
-            self._recognized_revision = self._canvas.revision
-            self._submit_question(text)
-            return
-        if self._recognized_revision == self._canvas.revision and self._current_input_text:
+        if self._input_mode == "document" and self._current_input_text:
             self._submit_question(self._current_input_text)
             return
-        if self._recognized_revision != self._canvas.revision:
-            self._recognize_handwriting()
-            return
-        QMessageBox.information(self, "No text", "Please write on the board or choose Keyboard.")
-
-    def _recognize_with_google(self) -> None:
-        if not self._recognizer.google_available or not self._google_ocr_sources:
-            return
-        revision = self._canvas.revision
-        images = self._google_ocr_sources
-        self._run_background(
-            "Using Google Vision OCR...",
-            lambda: self._recognizer.recognize_many_with_google(images),
-            lambda result: self._display_recognized_text(result, revision),
-            "Google Vision OCR failed",
-        )
+        self._input_mode = "whiteboard"
+        self._recognize_handwriting()
 
     def _clear_board(self) -> None:
         self._canvas.clear()
@@ -338,8 +305,6 @@ class MainWindow(QMainWindow):
         self._google_ocr_sources = ()
         self._current_input_text = ""
         self._input_mode = "whiteboard"
-        self._recognized_text_panel.clear()
-        self._hide_keyboard_panel()
 
     def _submit_question(self, text: str) -> None:
         prompt = self._prompt_builder.build_teacher_prompt(text)
@@ -452,15 +417,12 @@ class MainWindow(QMainWindow):
         self._log_console(f"{title}: {error}")
         if show_dialog:
             QMessageBox.critical(self, title, error)
-        else:
-            self._recognized_text_panel.set_status(f"{title}: {error}")
 
     def _set_busy(self, busy: bool, message: str = "") -> None:
         was_busy = self._busy_count > 0
         self._busy_count = max(0, self._busy_count + (1 if busy else -1))
         is_busy = self._busy_count > 0
         self._toolbar.set_busy(is_busy)
-        self._recognized_text_panel.set_busy(is_busy, message)
         self._canvas.set_processing_animation(is_busy)
         self._canvas.setEnabled(not is_busy)
         if is_busy and not was_busy:
@@ -476,11 +438,6 @@ class MainWindow(QMainWindow):
         self._input_mode = "whiteboard"
         self._recognized_revision = None
         self._current_input_text = ""
-        self._hide_keyboard_panel()
-
-    def _hide_keyboard_panel(self) -> None:
-        if self._recognized_text_panel.isVisible():
-            self._recognized_text_panel.hide()
 
     def _toggle_console(self) -> None:
         self._console_panel.setVisible(not self._console_panel.isVisible())
@@ -522,13 +479,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addStretch(1)
         return header
-
-    def _apply_blackboard_shadow(self) -> None:
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
-        shadow.setOffset(0, 4)
-        shadow.setColor(QColor(0, 0, 0, 90))
-        self._canvas.setGraphicsEffect(shadow)
 
     def _build_console_panel(self) -> tuple[QFrame, QPlainTextEdit]:
         panel = QFrame()
@@ -637,34 +587,6 @@ class MainWindow(QMainWindow):
                 padding: 8px;
                 font-family: Consolas, "Courier New", monospace;
                 font-size: 12px;
-            }
-            #RecognizedTextPanel {
-                background: #111827;
-                border-top: 1px solid #374151;
-            }
-            #RecognizedTextTitle {
-                color: #ffffff;
-                font-size: 17px;
-                font-weight: 700;
-            }
-            #RecognizedTextStatus {
-                color: #9ca3af;
-                font-size: 13px;
-            }
-            #RecognizedTextEditor {
-                background: #000000;
-                color: #ffffff;
-                border: 1px solid #ffffff;
-                border-radius: 25px;
-                padding: 10px 16px;
-                font-size: 18px;
-                selection-background-color: #2563eb;
-                selection-color: #ffffff;
-            }
-            #RecognizedTextPanel QPushButton {
-                min-height: 34px;
-                padding: 4px 12px;
-                border-radius: 5px;
             }
             """
         )

@@ -10,6 +10,7 @@ class RecognitionConfirmDialog(QDialog):
         parent=None,  # type: ignore[no-untyped-def]
         title: str = "Confirm question",
         instructions: str = "Review or edit the text before sending it to EdTalkies.",
+        proceed_label: str = "OK",
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -23,6 +24,9 @@ class RecognitionConfirmDialog(QDialog):
         layout.addWidget(self._editor)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        proceed_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if proceed_button is not None:
+            proceed_button.setText(proceed_label)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
