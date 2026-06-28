@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import zipfile
 
 from aiboard_app.ai.response_parser import ParsedResponse
 from aiboard_app.chat.chat_exporter import ChatExporter
@@ -43,6 +44,8 @@ def test_chat_exporter_writes_txt_docx_and_pdf(tmp_path) -> None:
     txt_path = exporter.export(chat, "txt")
     docx_path = exporter.export(chat, "docx")
     pdf_path = exporter.export(chat, "pdf")
+    xlsx_path = exporter.export(chat, "xlsx")
+    pptx_path = exporter.export(chat, "pptx")
 
     text = txt_path.read_text(encoding="utf-8")
     assert "What is photosynthesis?" in text
@@ -50,5 +53,15 @@ def test_chat_exporter_writes_txt_docx_and_pdf(tmp_path) -> None:
     assert "2026-06-28 10:30:00" in text
     assert docx_path.exists()
     assert pdf_path.exists()
+    assert xlsx_path.exists()
+    assert pptx_path.exists()
     assert docx_path.name == "AiBoard_Chat_20260628_103000.docx"
     assert pdf_path.name == "AiBoard_Chat_20260628_103000.pdf"
+    assert xlsx_path.name == "AiBoard_Chat_20260628_103000.xlsx"
+    assert pptx_path.name == "AiBoard_Chat_20260628_103000.pptx"
+    with zipfile.ZipFile(xlsx_path) as archive:
+        sheet = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    assert "What is photosynthesis?" in sheet
+    with zipfile.ZipFile(pptx_path) as archive:
+        slide = archive.read("ppt/slides/slide1.xml").decode("utf-8")
+    assert "Photosynthesis is how plants make food." in slide

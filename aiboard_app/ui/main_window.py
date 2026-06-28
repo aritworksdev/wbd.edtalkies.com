@@ -448,6 +448,8 @@ class MainWindow(QMainWindow):
             "pdf": "PDF files (*.pdf)",
             "docx": "Word documents (*.docx)",
             "txt": "Text files (*.txt)",
+            "xlsx": "Excel workbooks (*.xlsx)",
+            "pptx": "PowerPoint presentations (*.pptx)",
         }
         file_name, _ = QFileDialog.getSaveFileName(
             self,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSlider,
 )
+
+from aiboard_app.ui.icon_assets import IconName, load_icon
 
 
 class WhiteboardToolbar(QFrame):
@@ -29,70 +31,104 @@ class WhiteboardToolbar(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("WhiteboardToolbar")
+        self._icon_buttons: list[QPushButton] = []
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(14, 8, 14, 8)
+        layout.setSpacing(14)
 
         self._tool_group = QButtonGroup(self)
         self._tool_group.setExclusive(True)
 
-        pen_button = self._button("✎ Pen")
+        pen_button = self._button(IconName.EDIT, "Drawing mode")
         pen_button.setCheckable(True)
         pen_button.setChecked(True)
         pen_button.clicked.connect(lambda: self.eraser_toggled.emit(False))
 
-        eraser_button = self._button("⌫ Eraser")
+        eraser_button = self._button(IconName.ERASE, "Erase mode")
         eraser_button.setCheckable(True)
         eraser_button.clicked.connect(lambda: self.eraser_toggled.emit(True))
 
         self._tool_group.addButton(pen_button)
         self._tool_group.addButton(eraser_button)
 
-        color_button = self._button("◉ Color")
+        color_button = self._button(IconName.EDIT, "Choose pen color")
         color_button.clicked.connect(self._choose_color)
 
         width_slider = QSlider(Qt.Orientation.Horizontal)
         width_slider.setMinimum(2)
         width_slider.setMaximum(24)
         width_slider.setValue(6)
-        width_slider.setFixedWidth(150)
+        width_slider.setFixedWidth(140)
         width_slider.valueChanged.connect(self.width_changed.emit)
 
         actions = [
             pen_button,
             eraser_button,
             color_button,
-            self._button("↶ Undo", self.undo_requested.emit),
-            self._button("↷ Redo", self.redo_requested.emit),
-            self._button("⟲ Clear", self.clear_requested.emit),
-            self._button("✨ Ask AI", self.ask_requested.emit, "AskAiButton"),
-            self._button("⌨ Keyboard", self.keyboard_requested.emit),
-            self._button("⇪ Upload", self.document_requested.emit),
-            self._button("▤ Console", self.console_requested.emit),
-            self._button("💾 Save", self.save_requested.emit),
-            self._button("⏻ Exit", self.exit_requested.emit, "ExitButton"),
+            self._button(IconName.UNDO, "Undo", self.undo_requested.emit),
+            self._button(IconName.UNDO, "Redo", self.redo_requested.emit),
+            self._button(IconName.ERASE, "Clear board", self.clear_requested.emit),
+            self._button(IconName.ASK_AI, "Ask AI", self.ask_requested.emit, "AskAiButton"),
+            self._button(IconName.KEYBOARD, "Keyboard mode", self.keyboard_requested.emit),
+            self._button(IconName.UPLOAD, "Upload document", self.document_requested.emit),
+            self._button(IconName.CONSOLE, "Console Log", self.console_requested.emit),
+            self._button(IconName.UPDATE, "Save board image", self.save_requested.emit),
+            self._button(IconName.CLOSE, "Exit", self.exit_requested.emit, "ExitButton"),
         ]
         for widget in actions[:3]:
             layout.addWidget(widget)
         layout.addWidget(width_slider)
         for widget in actions[3:]:
             layout.addWidget(widget)
+        layout.addStretch(1)
+        self._apply_responsive_icon_size()
 
-    def _button(self, label: str, callback=None, object_name: str = "") -> QPushButton:  # type: ignore[no-untyped-def]
-        button = QPushButton(label)
-        button.setMinimumHeight(44)
-        button.setMinimumWidth(84)
+    def _button(
+        self,
+        icon_name: str,
+        tooltip: str,
+        callback=None,  # type: ignore[no-untyped-def]
+        object_name: str = "",
+    ) -> QPushButton:
+        button = QPushButton()
+        button.setText("")
+        button.setIcon(load_icon(icon_name))
+        button.setToolTip(tooltip)
+        button.setAccessibleName(tooltip)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        button.setProperty("iconOnly", True)
         if object_name:
             button.setObjectName(object_name)
         if callback:
             button.clicked.connect(callback)
+        self._icon_buttons.append(button)
         return button
 
     def set_busy(self, busy: bool) -> None:
-        for button in self.findChildren(QPushButton):
-            button.setEnabled("Console" in button.text() or not busy)
+        for button in self._icon_buttons:
+            button.setEnabled(button.toolTip() == "Console Log" or not busy)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._apply_responsive_icon_size()
+        super().resizeEvent(event)
 
     def _choose_color(self) -> None:
         color = QColorDialog.getColor(QColor("#ffffff"), self, "Choose pen color")
         if color.isValid():
             self.color_changed.emit(color)
+
+    def _apply_responsive_icon_size(self) -> None:
+        width = self.window().width() if self.window() else self.width()
+        if width >= 1800:
+            icon_size, touch_size = 44, 58
+        elif width >= 1200:
+            icon_size, touch_size = 34, 48
+        else:
+            icon_size, touch_size = 26, 40
+        size = QSize(icon_size, icon_size)
+        for button in self._icon_buttons:
+            button.setIconSize(size)
+            button.setMinimumSize(touch_size, touch_size)
+            button.setMaximumSize(touch_size, touch_size)

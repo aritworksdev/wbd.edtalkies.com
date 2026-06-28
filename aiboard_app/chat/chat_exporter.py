@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import zipfile
 from html import unescape
+from xml.sax.saxutils import escape
 from pathlib import Path
 
 from aiboard_app.chat.chat_record import ChatRecord
@@ -26,6 +28,10 @@ class ChatExporter:
             self._export_docx(chat, path)
         elif suffix == "pdf":
             self._export_pdf(chat, path)
+        elif suffix == "xlsx":
+            self._export_xlsx(chat, path)
+        elif suffix == "pptx":
+            self._export_pptx(chat, path)
         else:
             raise ValueError(f"Unsupported export type: {file_type}")
         return path
@@ -77,6 +83,90 @@ class ChatExporter:
         doc.save(path)
         doc.close()
 
+    def _export_xlsx(self, chat: ChatRecord, path: Path) -> None:
+        rows = [
+            ("Field", "Value"),
+            ("Created", chat.created_at.strftime("%Y-%m-%d %H:%M:%S")),
+            ("Chat ID", chat.id),
+            ("Recognized Text / Request", chat.request_text),
+            ("Response Title", chat.response.title or "EdTalkies Response"),
+            ("AI Response", self._response_text(chat)),
+        ]
+        sheet_rows = []
+        for row_index, (field, value) in enumerate(rows, start=1):
+            sheet_rows.append(
+                "<row r=\"{row}\">"
+                "<c r=\"A{row}\" t=\"inlineStr\"><is><t>{field}</t></is></c>"
+                "<c r=\"B{row}\" t=\"inlineStr\"><is><t>{value}</t></is></c>"
+                "</row>".format(
+                    row=row_index,
+                    field=escape(field),
+                    value=escape(value),
+                )
+            )
+        files = {
+            "[Content_Types].xml": """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>""",
+            "_rels/.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>""",
+            "xl/workbook.xml": """<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="AiBoard Chat" sheetId="1" r:id="rId1"/></sheets>
+</workbook>""",
+            "xl/_rels/workbook.xml.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>""",
+            "xl/worksheets/sheet1.xml": f"""<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>{''.join(sheet_rows)}</sheetData>
+</worksheet>""",
+        }
+        self._write_zip(path, files)
+
+    def _export_pptx(self, chat: ChatRecord, path: Path) -> None:
+        body = escape(self._response_text(chat))
+        request = escape(chat.request_text)
+        created = escape(chat.created_at.strftime("%Y-%m-%d %H:%M:%S"))
+        files = {
+            "[Content_Types].xml": """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+</Types>""",
+            "_rels/.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>""",
+            "ppt/presentation.xml": """<?xml version="1.0" encoding="UTF-8"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst>
+  <p:sldSz cx="12192000" cy="6858000"/>
+</p:presentation>""",
+            "ppt/_rels/presentation.xml.rels": """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+</Relationships>""",
+            "ppt/slides/slide1.xml": f"""<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>AiBoard Chat</a:t></a:r></a:p></p:txBody></p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="3" name="Content"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Created: {created}</a:t></a:r></a:p><a:p><a:r><a:t>Request: {request}</a:t></a:r></a:p><a:p><a:r><a:t>Response: {body}</a:t></a:r></a:p></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+</p:sld>""",
+        }
+        self._write_zip(path, files)
+
     def _plain_content(self, chat: ChatRecord) -> str:
         return "\n".join(
             [
@@ -102,3 +192,9 @@ class ChatExporter:
         text = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", text)
         text = re.sub(r"<[^>]+>", "", text)
         return unescape(text).strip()
+
+    @staticmethod
+    def _write_zip(path: Path, files: dict[str, str]) -> None:
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name, content in files.items():
+                archive.writestr(name, content)

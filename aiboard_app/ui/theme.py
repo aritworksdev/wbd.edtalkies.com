@@ -75,34 +75,23 @@ class EdTalkiesTheme:
             border-bottom: 1px solid {cls.PANEL_LINE};
         }}
         #WhiteboardToolbar QPushButton {{
-            background: rgba(255, 255, 255, 0.08);
+            background: transparent;
             color: {cls.TEXT};
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 18px;
-            padding: 8px 12px;
+            border: 0;
+            border-radius: 10px;
+            padding: 4px;
             font-family: {cls.FONT_BODY};
             font-size: 15px;
             font-weight: 700;
         }}
         #WhiteboardToolbar QPushButton:hover {{
-            background: rgba(255, 255, 255, 0.16);
-            border-color: rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.10);
+        }}
+        #WhiteboardToolbar QPushButton:focus {{
+            background: rgba(255, 255, 255, 0.08);
         }}
         #WhiteboardToolbar QPushButton:checked {{
-            background: rgba(147, 112, 219, 0.28);
-            border-color: {cls.PURPLE};
-        }}
-        #WhiteboardToolbar QPushButton#AskAiButton {{
-            background: {cls.GREEN};
-            border-color: {cls.GREEN};
-            color: {cls.TEXT};
-        }}
-        #WhiteboardToolbar QPushButton#AskAiButton:hover {{
-            background: {cls.GREEN_HOVER};
-            border-color: {cls.GREEN_HOVER};
-        }}
-        #WhiteboardToolbar QPushButton#ExitButton {{
-            border-color: rgba(245, 158, 11, 0.65);
+            background: rgba(147, 112, 219, 0.22);
         }}
         #WhiteboardToolbar QSlider::groove:horizontal {{
             height: 5px;
@@ -121,16 +110,19 @@ class EdTalkiesTheme:
             color: {cls.RESPONSE_TEXT};
         }}
         #ResponsePanel QPushButton {{
-            background: {cls.GREEN};
+            background: transparent;
             color: {cls.TEXT};
             border: 0;
-            border-radius: 14px;
-            padding: 7px 12px;
+            border-radius: 10px;
+            padding: 4px;
             font-family: {cls.FONT_BODY};
             font-weight: 700;
         }}
         #ResponsePanel QPushButton:hover {{
-            background: {cls.GREEN_HOVER};
+            background: rgba(16, 163, 127, 0.12);
+        }}
+        #ResponsePanel QPushButton:focus {{
+            background: rgba(30, 144, 255, 0.12);
         }}
         #ResponseTitle {{
             font-family: {cls.FONT_DISPLAY};

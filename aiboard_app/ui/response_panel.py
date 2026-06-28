@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal, QUrl
+from PySide6.QtCore import QSize, Qt, Signal, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from aiboard_app.ai.response_parser import ParsedResponse
 from aiboard_app.chat.chat_record import ChatRecord
+from aiboard_app.ui.icon_assets import IconName, load_icon
 from aiboard_app.ui.theme import EdTalkiesTheme
 
 try:
@@ -35,17 +36,18 @@ class ResponsePanel(QFrame):
         self.setObjectName("ResponsePanel")
         self.setMinimumWidth(420)
         self.setMaximumWidth(720)
+        self._icon_buttons: list[QPushButton] = []
 
         layout = QVBoxLayout(self)
         header = QHBoxLayout()
         self._title = QLabel("EdTalkies Response")
         self._title.setObjectName("ResponseTitle")
-        close_button = QPushButton("✕ Close")
-        close_button.clicked.connect(self.close_requested.emit)
-        copy_button = QPushButton("⧉ Copy")
+        copy_button = self._icon_button(IconName.UPDATE, "Copy response", small=True)
         copy_button.clicked.connect(self._copy_response)
-        save_button = QPushButton("💾 Save")
+        save_button = self._icon_button(IconName.UPDATE, "Save response", small=True)
         save_button.clicked.connect(self._save_response)
+        close_button = self._icon_button(IconName.CLOSE, "Close response panel", small=True)
+        close_button.clicked.connect(self.close_requested.emit)
         header.addWidget(self._title, 1)
         header.addWidget(copy_button)
         header.addWidget(save_button)
@@ -66,16 +68,16 @@ class ResponsePanel(QFrame):
         self._exports = QHBoxLayout()
         export_label = QLabel("Export:")
         export_label.setObjectName("ResponseExportLabel")
-        self._pdf_button = QPushButton("▣ PDF")
-        self._docx_button = QPushButton("▤ Word / DOCX")
-        self._txt_button = QPushButton("☰ Text")
-        self._pdf_button.clicked.connect(lambda: self.export_requested.emit("pdf"))
+        self._docx_button = self._icon_button(IconName.DOCX, "Export as Word", small=True)
+        self._excel_button = self._icon_button(IconName.EXCEL, "Export as Excel", small=True)
+        self._pptx_button = self._icon_button(IconName.PPTX, "Export as PowerPoint", small=True)
         self._docx_button.clicked.connect(lambda: self.export_requested.emit("docx"))
-        self._txt_button.clicked.connect(lambda: self.export_requested.emit("txt"))
+        self._excel_button.clicked.connect(lambda: self.export_requested.emit("xlsx"))
+        self._pptx_button.clicked.connect(lambda: self.export_requested.emit("pptx"))
         self._exports.addWidget(export_label)
-        self._exports.addWidget(self._pdf_button)
         self._exports.addWidget(self._docx_button)
-        self._exports.addWidget(self._txt_button)
+        self._exports.addWidget(self._excel_button)
+        self._exports.addWidget(self._pptx_button)
         self._exports.addStretch(1)
         layout.addLayout(self._exports)
         self._current_response = ParsedResponse("", "", "")
@@ -100,12 +102,12 @@ class ResponsePanel(QFrame):
         for document in response.documents:
             row = QHBoxLayout()
             label = QLabel(f"{document.file_name} ({document.file_type}) — {document.status}")
-            open_button = QPushButton("Download & Open")
+            open_button = self._icon_button(IconName.UPDATE, "Download and open document", small=True)
             open_button.clicked.connect(
                 lambda checked=False, url=document.url, name=document.file_name:
                     self.document_open_requested.emit(url, name)
             )
-            download_button = QPushButton("Download")
+            download_button = self._icon_button(IconName.UPLOAD, "Download document", small=True)
             download_button.clicked.connect(
                 lambda checked=False, url=document.url, name=document.file_name:
                     self.document_download_requested.emit(url, name)
@@ -158,9 +160,43 @@ class ResponsePanel(QFrame):
             QMessageBox.warning(self, "Save failed", str(exc))
 
     def _set_export_buttons_enabled(self, enabled: bool) -> None:
-        self._pdf_button.setEnabled(enabled)
         self._docx_button.setEnabled(enabled)
-        self._txt_button.setEnabled(enabled)
+        self._excel_button.setEnabled(enabled)
+        self._pptx_button.setEnabled(enabled)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._apply_icon_sizes()
+        super().resizeEvent(event)
+
+    def _icon_button(self, icon_name: str, tooltip: str, small: bool = False) -> QPushButton:
+        button = QPushButton()
+        button.setText("")
+        button.setIcon(load_icon(icon_name))
+        button.setToolTip(tooltip)
+        button.setAccessibleName(tooltip)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        button.setProperty("iconOnly", True)
+        button.setProperty("smallIcon", small)
+        self._icon_buttons.append(button)
+        self._apply_icon_size(button)
+        return button
+
+    def _apply_icon_sizes(self) -> None:
+        for button in self._icon_buttons:
+            self._apply_icon_size(button)
+
+    def _apply_icon_size(self, button: QPushButton) -> None:
+        width = self.window().width() if self.window() else self.width()
+        if width >= 1800:
+            icon_size, touch_size = (34, 46) if button.property("smallIcon") else (44, 58)
+        elif width >= 1200:
+            icon_size, touch_size = (28, 40) if button.property("smallIcon") else (34, 48)
+        else:
+            icon_size, touch_size = (24, 36) if button.property("smallIcon") else (26, 40)
+        button.setIconSize(QSize(icon_size, icon_size))
+        button.setMinimumSize(touch_size, touch_size)
+        button.setMaximumSize(touch_size, touch_size)
 
     @staticmethod
     def _wrap_html(content: str, chat: ChatRecord | None = None) -> str:
