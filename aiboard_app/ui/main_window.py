@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
+from PySide6.QtCore import QObject, QRectF, QRunnable, QThreadPool, Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QColor, QConicalGradient, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -60,6 +61,60 @@ class BackgroundWorker(QRunnable):
             self.signals.finished.emit()
 
 
+class ProcessingFrame(QWidget):
+    BORDER_WIDTH = 3
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._processing = False
+        self._border_angle = 0
+        self._timer = QTimer(self)
+        self._timer.setInterval(70)
+        self._timer.timeout.connect(self._advance_border)
+
+    def set_processing_animation(self, enabled: bool) -> None:
+        if self._processing == enabled:
+            return
+        self._processing = enabled
+        if enabled:
+            self._timer.start()
+        else:
+            self._timer.stop()
+            self._border_angle = 0
+        self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().paintEvent(event)
+        if not self._processing:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        border_rect = QRectF(self.rect()).adjusted(
+            self.BORDER_WIDTH / 2,
+            self.BORDER_WIDTH / 2,
+            -self.BORDER_WIDTH / 2,
+            -self.BORDER_WIDTH / 2,
+        )
+        gradient = QConicalGradient(border_rect.center(), self._border_angle)
+        gradient.setColorAt(0.00, QColor("#ff0000"))
+        gradient.setColorAt(0.14, QColor("#ffa500"))
+        gradient.setColorAt(0.28, QColor("#ffff00"))
+        gradient.setColorAt(0.42, QColor("#00ff00"))
+        gradient.setColorAt(0.56, QColor("#00ffff"))
+        gradient.setColorAt(0.70, QColor("#0000ff"))
+        gradient.setColorAt(0.84, QColor("#8f00ff"))
+        gradient.setColorAt(1.00, QColor("#ff0000"))
+        pen = QPen(gradient, self.BORDER_WIDTH)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(border_rect)
+
+    def _advance_border(self) -> None:
+        self._border_angle = (self._border_angle + 6) % 360
+        self.update()
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -92,9 +147,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
 
-        root = QWidget()
+        root = ProcessingFrame()
+        root.setObjectName("AppRoot")
+        self._processing_frame = root
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setContentsMargins(
+            ProcessingFrame.BORDER_WIDTH,
+            ProcessingFrame.BORDER_WIDTH,
+            ProcessingFrame.BORDER_WIDTH,
+            ProcessingFrame.BORDER_WIDTH,
+        )
         root_layout.setSpacing(0)
 
         self._header = self._build_header()
@@ -423,7 +485,7 @@ class MainWindow(QMainWindow):
         self._busy_count = max(0, self._busy_count + (1 if busy else -1))
         is_busy = self._busy_count > 0
         self._toolbar.set_busy(is_busy)
-        self._canvas.set_processing_animation(is_busy)
+        self._processing_frame.set_processing_animation(is_busy)
         self._canvas.setEnabled(not is_busy)
         if is_busy and not was_busy:
             self._log_console("Processing animation started.")
@@ -514,6 +576,7 @@ class MainWindow(QMainWindow):
     def _apply_styles(self) -> None:
         self.setStyleSheet(
             """
+            #AppRoot { background: #000000; }
             #AiBoardMainWindow { background: #000000; }
             #AppHeader, #AppFooter {
                 background: #111827;
