@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from aiboard_app.ai.response_parser import ParsedResponse
+from aiboard_app.chat.chat_record import ChatRecord
 
 try:
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -26,6 +27,7 @@ class ResponsePanel(QFrame):
     close_requested = Signal()
     document_open_requested = Signal(str, str)
     document_download_requested = Signal(str, str)
+    export_requested = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -60,12 +62,34 @@ class ResponsePanel(QFrame):
 
         self._documents = QVBoxLayout()
         layout.addLayout(self._documents)
+        self._exports = QHBoxLayout()
+        export_label = QLabel("Export:")
+        export_label.setObjectName("ResponseExportLabel")
+        self._pdf_button = QPushButton("PDF")
+        self._docx_button = QPushButton("Word / DOCX")
+        self._txt_button = QPushButton("Text")
+        self._pdf_button.clicked.connect(lambda: self.export_requested.emit("pdf"))
+        self._docx_button.clicked.connect(lambda: self.export_requested.emit("docx"))
+        self._txt_button.clicked.connect(lambda: self.export_requested.emit("txt"))
+        self._exports.addWidget(export_label)
+        self._exports.addWidget(self._pdf_button)
+        self._exports.addWidget(self._docx_button)
+        self._exports.addWidget(self._txt_button)
+        self._exports.addStretch(1)
+        layout.addLayout(self._exports)
         self._current_response = ParsedResponse("", "", "")
+        self._current_chat: ChatRecord | None = None
+        self._set_export_buttons_enabled(False)
 
-    def show_response(self, response: ParsedResponse) -> None:
+    @property
+    def current_chat(self) -> ChatRecord | None:
+        return self._current_chat
+
+    def show_response(self, response: ParsedResponse, chat: ChatRecord | None = None) -> None:
         self._current_response = response
+        self._current_chat = chat
         self._title.setText(response.title)
-        html = self._wrap_html(response.html or response.text)
+        html = self._wrap_html(response.html or response.text, chat)
         if QWebEngineView is not None and isinstance(self._viewer, QWebEngineView):
             self._viewer.setHtml(html, QUrl("https://edtalkies.com/"))
         elif isinstance(self._viewer, QTextBrowser):
@@ -89,6 +113,7 @@ class ResponsePanel(QFrame):
             row.addWidget(download_button)
             row.addWidget(open_button)
             self._documents.addLayout(row)
+        self._set_export_buttons_enabled(chat is not None)
         self.show()
 
     def _clear_documents(self) -> None:
@@ -105,7 +130,14 @@ class ResponsePanel(QFrame):
                         child.widget().deleteLater()
 
     def _copy_response(self) -> None:
-        text = self._current_response.text or self._current_response.html
+        if self._current_chat is not None:
+            text = (
+                f"Created: {self._current_chat.created_at:%Y-%m-%d %H:%M:%S}\n\n"
+                f"Request:\n{self._current_chat.request_text}\n\n"
+                f"Response:\n{self._current_response.text or self._current_response.html}"
+            )
+        else:
+            text = self._current_response.text or self._current_response.html
         QGuiApplication.clipboard().setText(text)
 
     def _save_response(self) -> None:
@@ -124,8 +156,22 @@ class ResponsePanel(QFrame):
         except OSError as exc:
             QMessageBox.warning(self, "Save failed", str(exc))
 
+    def _set_export_buttons_enabled(self, enabled: bool) -> None:
+        self._pdf_button.setEnabled(enabled)
+        self._docx_button.setEnabled(enabled)
+        self._txt_button.setEnabled(enabled)
+
     @staticmethod
-    def _wrap_html(content: str) -> str:
+    def _wrap_html(content: str, chat: ChatRecord | None = None) -> str:
+        chat_header = ""
+        if chat is not None:
+            chat_header = f"""
+<section class="chat-meta">
+  <div><strong>Created:</strong> {chat.created_at:%Y-%m-%d %H:%M:%S}</div>
+  <h3>Recognized Text / Request</h3>
+  <p>{ResponsePanel._escape(chat.request_text).replace(chr(10), '<br>')}</p>
+</section>
+"""
         return f"""
 <!doctype html>
 <html>
@@ -137,6 +183,8 @@ class ResponsePanel(QFrame):
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
     body {{ font-family: Arial, sans-serif; font-size: 22px; line-height: 1.45; color: #1f2933; }}
+    .chat-meta {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 16px; }}
+    .chat-meta h3 {{ margin-bottom: 6px; }}
     table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
     th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
     th {{ background: #eef2f7; }}
@@ -144,6 +192,16 @@ class ResponsePanel(QFrame):
     img {{ max-width: 100%; height: auto; }}
   </style>
 </head>
-<body>{content}</body>
+<body>{chat_header}{content}</body>
 </html>
 """
+
+    @staticmethod
+    def _escape(value: str) -> str:
+        return (
+            value.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#x27;")
+        )

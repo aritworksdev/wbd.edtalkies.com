@@ -5,6 +5,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from PySide6.QtCore import QObject, QRectF, QRunnable, QThreadPool, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QConicalGradient, QPainter, QPen
@@ -23,13 +24,17 @@ from PySide6.QtWidgets import (
 
 from aiboard_app.ai.edtalkies_client import AiQuery, EdTalkiesClient
 from aiboard_app.ai.prompt_builder import PromptBuilder
-from aiboard_app.ai.response_parser import ResponseParser
+from aiboard_app.ai.response_parser import ParsedResponse, ResponseParser
 from aiboard_app.app.config import AppSettings
+from aiboard_app.chat.chat_exporter import ChatExporter
+from aiboard_app.chat.chat_record import ChatRecord
+from aiboard_app.chat.chat_store import ChatStore
 from aiboard_app.documents.document_manager import DocumentManager
 from aiboard_app.documents.document_text_extractor import DocumentExtraction
 from aiboard_app.recognition.handwriting_recognizer import HandwritingRecognizer
 from aiboard_app.recognition.ocr_result import OcrResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
+from aiboard_app.ui.chat_history_panel import ChatHistoryPanel
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.toolbar import WhiteboardToolbar
@@ -143,6 +148,10 @@ class MainWindow(QMainWindow):
         self._google_ocr_sources: tuple[bytes, ...] = ()
         self._current_input_text = ""
         self._input_mode = "whiteboard"
+        self._pending_request_text = ""
+        self._chat_store = ChatStore(settings.export_dir)
+        self._chat_exporter = ChatExporter(settings.export_dir)
+        self._chats = self._chat_store.load()
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -166,6 +175,8 @@ class MainWindow(QMainWindow):
         self._response_panel.hide()
         self._console_panel, self._console_output = self._build_console_panel()
         self._console_panel.hide()
+        self._chat_history_panel = ChatHistoryPanel()
+        self._chat_history_panel.set_chats(self._chats)
         self._footer = self._build_footer()
 
         body = QHBoxLayout()
@@ -174,6 +185,7 @@ class MainWindow(QMainWindow):
         body.addWidget(self._canvas, 1)
         body.addWidget(self._response_panel)
         body.addWidget(self._console_panel)
+        body.addWidget(self._chat_history_panel)
 
         root_layout.addWidget(self._header)
         root_layout.addWidget(self._toolbar)
@@ -209,6 +221,8 @@ class MainWindow(QMainWindow):
         self._response_panel.close_requested.connect(self._response_panel.hide)
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
+        self._response_panel.export_requested.connect(self._export_current_chat)
+        self._chat_history_panel.chat_selected.connect(self._open_chat)
 
     def _recognize_handwriting(self) -> None:
         if self._recognition_in_progress:
@@ -367,12 +381,14 @@ class MainWindow(QMainWindow):
         self._google_ocr_sources = ()
         self._current_input_text = ""
         self._input_mode = "whiteboard"
+        self._pending_request_text = ""
 
     def _submit_question(self, text: str) -> None:
         prompt = self._prompt_builder.build_teacher_prompt(text)
         if not prompt:
             QMessageBox.information(self, "No text", "Please enter a question before sending.")
             return
+        self._pending_request_text = prompt
         self._log_console("Ask AI API request started.")
         self._run_background(
             "Asking EdTalkies AI…",
@@ -391,7 +407,63 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Empty response", "EdTalkies returned an empty response.")
             return
         self._log_console("Ask AI API response received.")
-        self._response_panel.show_response(parsed)
+        chat = self._create_chat(parsed)
+        self._persist_chat(chat)
+        self._response_panel.show_response(parsed, chat)
+
+    def _create_chat(self, response: ParsedResponse) -> ChatRecord:
+        return ChatRecord(
+            id=str(uuid4()),
+            request_text=self._pending_request_text or self._current_input_text,
+            response=response,
+            created_at=datetime.now(),
+            session_id=self._settings.edtalkies.session_id,
+        )
+
+    def _persist_chat(self, chat: ChatRecord) -> None:
+        try:
+            self._chats = self._chat_store.save_chat(chat)
+        except OSError as exc:
+            self._log_console(f"Chat history save failed: {exc}")
+            return
+        self._chat_history_panel.set_chats(self._chats)
+        self._log_console("Ask AI chat saved to local history.")
+
+    def _open_chat(self, chat_id: str) -> None:
+        chat = next((record for record in self._chats if record.id == chat_id), None)
+        if chat is None:
+            QMessageBox.warning(self, "Chat unavailable", "The selected chat could not be found.")
+            return
+        self._response_panel.show_response(chat.response, chat)
+        self._log_console("Previous chat opened.")
+
+    def _export_current_chat(self, file_type: str) -> None:
+        chat = self._response_panel.current_chat
+        if chat is None:
+            QMessageBox.information(self, "No chat selected", "Open or create a chat before exporting.")
+            return
+        default_path = self._chat_exporter.default_path(chat, file_type)
+        filters = {
+            "pdf": "PDF files (*.pdf)",
+            "docx": "Word documents (*.docx)",
+            "txt": "Text files (*.txt)",
+        }
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Export chat as {file_type.upper()}",
+            str(default_path),
+            filters.get(file_type, "All files (*)"),
+        )
+        if not file_name:
+            return
+        try:
+            path = self._chat_exporter.export(chat, file_type, Path(file_name))
+        except Exception as exc:
+            QMessageBox.warning(self, "Export failed", str(exc))
+            self._log_console(f"Chat export failed: {exc}")
+            return
+        QMessageBox.information(self, "Export complete", f"Saved to:\n{path}")
+        self._log_console(f"Chat exported as {file_type.upper()}.")
 
     def _save_board_image(self) -> None:
         file_name, _ = QFileDialog.getSaveFileName(
@@ -650,6 +722,31 @@ class MainWindow(QMainWindow):
                 padding: 8px;
                 font-family: Consolas, "Courier New", monospace;
                 font-size: 12px;
+            }
+            #ChatHistoryPanel {
+                background: #0f172a;
+                border-left: 1px solid #1f2937;
+            }
+            #ChatHistoryTitle {
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: 700;
+            }
+            #ChatHistoryList {
+                background: #111827;
+                color: #e5e7eb;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 4px;
+                font-size: 13px;
+            }
+            #ChatHistoryList::item {
+                border-bottom: 1px solid #273244;
+                padding: 8px;
+            }
+            #ChatHistoryList::item:selected {
+                background: #2563eb;
+                color: #ffffff;
             }
             """
         )
