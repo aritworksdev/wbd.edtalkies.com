@@ -18,7 +18,6 @@ class WhiteboardCanvas(QWidget):
     content_changed = Signal(int)
     BOARD_COLOR = QColor("#000000")
     BORDER_WIDTH = 5
-    BORDER_COLOR = QColor("#e5e5e5")
     BORDER_RADIUS = 24
 
     def __init__(self) -> None:
@@ -205,25 +204,24 @@ class WhiteboardCanvas(QWidget):
         self.update()
 
     def _draw_border(self, painter: QPainter) -> None:
+        if not self._animated_border:
+            return
         border_rect = QRectF(self.rect()).adjusted(
             self.BORDER_WIDTH / 2,
             self.BORDER_WIDTH / 2,
             -self.BORDER_WIDTH / 2,
             -self.BORDER_WIDTH / 2,
         )
-        if self._animated_border:
-            gradient = QConicalGradient(border_rect.center(), self._border_hue)
-            gradient.setColorAt(0.00, QColor("#ff0000"))
-            gradient.setColorAt(0.14, QColor("#ffa500"))
-            gradient.setColorAt(0.28, QColor("#ffff00"))
-            gradient.setColorAt(0.42, QColor("#00ff00"))
-            gradient.setColorAt(0.56, QColor("#00ffff"))
-            gradient.setColorAt(0.70, QColor("#0000ff"))
-            gradient.setColorAt(0.84, QColor("#8f00ff"))
-            gradient.setColorAt(1.00, QColor("#ff0000"))
-            pen = QPen(gradient, self.BORDER_WIDTH)
-        else:
-            pen = QPen(self.BORDER_COLOR, self.BORDER_WIDTH)
+        gradient = QConicalGradient(border_rect.center(), self._border_hue)
+        gradient.setColorAt(0.00, QColor("#ff0000"))
+        gradient.setColorAt(0.14, QColor("#ffa500"))
+        gradient.setColorAt(0.28, QColor("#ffff00"))
+        gradient.setColorAt(0.42, QColor("#00ff00"))
+        gradient.setColorAt(0.56, QColor("#00ffff"))
+        gradient.setColorAt(0.70, QColor("#0000ff"))
+        gradient.setColorAt(0.84, QColor("#8f00ff"))
+        gradient.setColorAt(1.00, QColor("#ff0000"))
+        pen = QPen(gradient, self.BORDER_WIDTH)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)

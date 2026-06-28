@@ -23,6 +23,7 @@ class WhiteboardToolbar(QFrame):
     ask_requested = Signal()
     keyboard_requested = Signal()
     document_requested = Signal()
+    console_requested = Signal()
     save_requested = Signal()
     exit_requested = Signal()
 
@@ -68,6 +69,7 @@ class WhiteboardToolbar(QFrame):
             self._button("Ask AI", self.ask_requested.emit),
             self._button("Keyboard", self.keyboard_requested.emit),
             self._button("Upload Document", self.document_requested.emit),
+            self._button("Console Log", self.console_requested.emit),
             self._button("Save", self.save_requested.emit),
             self._button("Exit", self.exit_requested.emit),
         ]
@@ -87,7 +89,7 @@ class WhiteboardToolbar(QFrame):
 
     def set_busy(self, busy: bool) -> None:
         for button in self.findChildren(QPushButton):
-            button.setEnabled(not busy)
+            button.setEnabled(button.text() == "Console Log" or not busy)
 
     def _choose_color(self) -> None:
         color = QColorDialog.getColor(QColor("#ffffff"), self, "Choose pen color")

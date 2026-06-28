@@ -34,7 +34,7 @@ def test_low_confidence_requires_edit_and_hides_google_when_unavailable() -> Non
     assert panel.can_submit is True
 
 
-def test_high_confidence_enables_ask_edtalkies() -> None:
+def test_high_confidence_allows_top_level_ask_ai_flow() -> None:
     _app()
     panel = RecognizedTextPanel()
     panel.set_recognition_result(
@@ -46,7 +46,7 @@ def test_high_confidence_enables_ask_edtalkies() -> None:
 
     assert panel.confidence_band == "high"
     assert panel.can_submit is True
-    assert panel._ask_button.isEnabled()
+    assert not hasattr(panel, "_ask_button")
 
 
 def test_low_confidence_shows_google_only_when_available() -> None:

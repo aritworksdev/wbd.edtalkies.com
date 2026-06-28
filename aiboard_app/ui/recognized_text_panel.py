@@ -10,7 +10,6 @@ from aiboard_app.recognition.ocr_result import OcrResult
 class RecognizedTextPanel(QFrame):
     """Editable confidence-aware staging area before EdTalkies submission."""
 
-    ask_requested = Signal()
     rewrite_requested = Signal()
     google_vision_requested = Signal()
 
@@ -38,16 +37,12 @@ class RecognizedTextPanel(QFrame):
         self._rewrite_button.clicked.connect(self.rewrite_requested.emit)
         self._google_button = QPushButton("Use Google Vision OCR")
         self._google_button.clicked.connect(self.google_vision_requested.emit)
-        self._ask_button = QPushButton("Ask EdTalkies")
-        self._ask_button.setObjectName("RecognizedTextAskButton")
-        self._ask_button.clicked.connect(self.ask_requested.emit)
 
         header.addWidget(title)
         header.addWidget(self._status, 1)
         header.addWidget(clear_button)
         header.addWidget(self._rewrite_button)
         header.addWidget(self._google_button)
-        header.addWidget(self._ask_button)
         layout.addLayout(header)
 
         self._editor = QTextEdit()
@@ -78,7 +73,6 @@ class RecognizedTextPanel(QFrame):
         self._status.setText(f"Ready to review and send ({source}).")
         self._rewrite_button.hide()
         self._google_button.hide()
-        self._ask_button.setEnabled(bool(text.strip()))
         self._editor.setFocus()
 
     def set_recognition_result(
@@ -106,16 +100,12 @@ class RecognizedTextPanel(QFrame):
             self._status.setText(f"{diagnostic} Ready to send.")
             self._rewrite_button.hide()
             self._google_button.hide()
-            self._ask_button.setEnabled(True)
-            self._ask_button.setText("Ask EdTalkies")
         elif confidence >= medium_threshold:
             self._band = "medium"
             self._status.setText(f"{diagnostic} Review highlighted words.")
             self._highlight_uncertain_words(result, high_threshold)
             self._rewrite_button.show()
             self._google_button.setVisible(google_available)
-            self._ask_button.setEnabled(True)
-            self._ask_button.setText("Confirm & Ask EdTalkies")
         else:
             self._band = "low"
             action = "Rewrite or use Google Vision OCR." if google_available else "Rewrite or edit the text."
@@ -123,8 +113,6 @@ class RecognizedTextPanel(QFrame):
             self._highlight_uncertain_words(result, medium_threshold)
             self._rewrite_button.show()
             self._google_button.setVisible(google_available)
-            self._ask_button.setEnabled(False)
-            self._ask_button.setText("Edit Text to Continue")
 
         self._editor.setFocus()
 
@@ -151,8 +139,6 @@ class RecognizedTextPanel(QFrame):
         self._status.setToolTip("")
         self._rewrite_button.hide()
         self._google_button.hide()
-        self._ask_button.setEnabled(False)
-        self._ask_button.setText("Ask EdTalkies")
 
     def set_status(self, message: str) -> None:
         self._status.setText(message)
@@ -160,7 +146,6 @@ class RecognizedTextPanel(QFrame):
     def set_busy(self, busy: bool, message: str = "") -> None:
         if message:
             self._status.setText(message)
-        self._ask_button.setEnabled(not busy and self.can_submit)
         self._rewrite_button.setEnabled(not busy)
         self._google_button.setEnabled(not busy)
         self._editor.setReadOnly(busy)
@@ -177,8 +162,6 @@ class RecognizedTextPanel(QFrame):
         if self._band == "low" and self.text():
             self._low_confidence_edited = True
             self._status.setText("Low-confidence text was edited. Review carefully before sending.")
-            self._ask_button.setText("Use Edited Text")
-        self._ask_button.setEnabled(self.can_submit)
 
     def _highlight_uncertain_words(self, result: OcrResult, threshold: float) -> None:
         selections: list[QTextEdit.ExtraSelection] = []
