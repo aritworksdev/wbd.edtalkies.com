@@ -12,6 +12,7 @@ from aiboard_app.ai.response_parser import ResponseParser
 from aiboard_app.app.config import AppSettings, EdTalkiesSettings
 from aiboard_app.documents.document_manager import DocumentManager
 from aiboard_app.system.shutdown_manager import ShutdownManager
+from aiboard_app.ui.icon_assets import IconName, icon_path
 from aiboard_app.ui.main_window import MainWindow
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.toolbar import WhiteboardToolbar
@@ -31,6 +32,17 @@ def test_toolbar_buttons_are_icon_only_with_accessible_names() -> None:
     assert all(button.text() == "" for button in buttons)
     assert all(button.toolTip() for button in buttons)
     assert all(button.accessibleName() for button in buttons)
+
+
+def test_required_toolbar_icons_exist_locally() -> None:
+    for icon_name in (
+        IconName.CONSOLE,
+        IconName.KEYBOARD,
+        IconName.REDO,
+        IconName.UNDO,
+        IconName.PLUS_OUTLINE,
+    ):
+        assert icon_path(icon_name).exists()
 
 
 def test_response_panel_export_controls_are_icon_only() -> None:
