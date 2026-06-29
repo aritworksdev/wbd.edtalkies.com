@@ -52,7 +52,7 @@ class EdTalkiesSettings:
     board_id: str
     device_id: str
     session_id: str = ""
-    quick_ask_channel: str = "WhatsApp"
+    quick_ask_channel: str = "WEB"
     quick_ask_phone: str = ""
     quick_ask_language: str = "English"
     quick_ask_source: str = "SendPulse"
@@ -147,7 +147,7 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
             board_id=os.getenv("EDTALKIES_BOARD_ID", ""),
             device_id=os.getenv("EDTALKIES_DEVICE_ID", ""),
             session_id=os.getenv("EDTALKIES_SESSION_ID", ""),
-            quick_ask_channel=os.getenv("EDTALKIES_QUICKASK_CHANNEL", "WhatsApp"),
+            quick_ask_channel=os.getenv("EDTALKIES_QUICKASK_CHANNEL", "WEB"),
             quick_ask_phone=os.getenv("EDTALKIES_QUICKASK_PHONE", ""),
             quick_ask_language=os.getenv("EDTALKIES_QUICKASK_LANGUAGE", "English"),
             quick_ask_source=os.getenv("EDTALKIES_QUICKASK_SOURCE", "SendPulse"),

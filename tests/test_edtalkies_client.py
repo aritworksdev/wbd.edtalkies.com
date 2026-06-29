@@ -49,7 +49,7 @@ def test_ask_posts_configured_payload() -> None:
     assert result == {"answer": "ok"}
     assert fake_session.url == "https://example.test/m18/query"
     assert fake_session.payload == {
-        "Channel": "WhatsApp",
+        "Channel": "WEB",
         "Phone": "",
         "Message": "What is gravity?",
         "Language": "English",

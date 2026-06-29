@@ -120,7 +120,7 @@ EDTALKIES_AI_QUERY_PATH=/api/AiBotTalkies/QuickAskAiTeacherAsync
 EDTALKIES_OCR_PATH=/api/ocr/handwriting
 EDTALKIES_TIMEOUT_SECONDS=30
 EDTALKIES_RETRY_COUNT=2
-EDTALKIES_QUICKASK_CHANNEL=WhatsApp
+EDTALKIES_QUICKASK_CHANNEL=WEB
 EDTALKIES_QUICKASK_PHONE=
 EDTALKIES_QUICKASK_LANGUAGE=English
 EDTALKIES_QUICKASK_SOURCE=SendPulse
@@ -135,7 +135,7 @@ The QuickAsk integration sends:
 
 ```json
 {
-  "Channel": "WhatsApp",
+  "Channel": "WEB",
   "Phone": "",
   "Message": "The reviewed teacher question",
   "Language": "English",
