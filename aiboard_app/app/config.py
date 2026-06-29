@@ -51,6 +51,7 @@ class EdTalkiesSettings:
     school_id: str
     board_id: str
     device_id: str
+    download_path: str = "/api/AiBotTalkies/DownloadDocument"
     session_id: str = ""
     quick_ask_channel: str = "WEB"
     quick_ask_phone: str = ""
@@ -139,6 +140,10 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
                 "/api/AiBotTalkies/QuickAskAiTeacherAsync",
             ),
             ocr_path=os.getenv("EDTALKIES_OCR_PATH", "/api/ocr/handwriting"),
+            download_path=os.getenv(
+                "EDTALKIES_DOWNLOAD_PATH",
+                "/api/AiBotTalkies/DownloadDocument",
+            ),
             timeout_seconds=_int_env("EDTALKIES_TIMEOUT_SECONDS", 120),
             retry_count=_int_env("EDTALKIES_RETRY_COUNT", 2),
             model=os.getenv("EDTALKIES_MODEL", "default"),

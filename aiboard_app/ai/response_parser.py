@@ -20,6 +20,22 @@ class ParsedResponse:
     text: str
     html: str
     documents: list[ResponseDocument] = field(default_factory=list)
+    unique_id: str = ""
+    message_type: str = ""
+    is_downloadable: bool = False
+    intent_content_type: str = ""
+    downloadable_link: str = ""
+
+    @property
+    def is_image_response(self) -> bool:
+        return self.message_type.strip().lower() in {
+            "image",
+            "poster",
+            "diagram",
+            "illustration",
+            "picture",
+            "photo",
+        }
 
 
 class ResponseParser:
@@ -30,6 +46,8 @@ class ResponseParser:
         intent = payload.get("Intent")
         if not isinstance(intent, dict):
             intent = {}
+        is_downloadable = self._as_bool(payload.get("IsDownloadable"))
+        downloadable_link = str(payload.get("DownloadableLink") or "").strip()
 
         title = str(
             payload.get("Title")
@@ -97,19 +115,34 @@ class ResponseParser:
                 )
             )
 
-        if self._as_bool(payload.get("IsDownloadable")):
-            download_url = str(payload.get("DownloadableLink") or "").strip()
-            if download_url:
+        if is_downloadable:
+            if downloadable_link:
                 documents.append(
                     ResponseDocument(
-                        file_name=self._file_name(download_url),
-                        file_type=self._file_type(download_url),
-                        url=download_url,
+                        file_name=self._file_name(downloadable_link),
+                        file_type=self._file_type(downloadable_link),
+                        url=downloadable_link,
                         status="available",
                     )
                 )
 
-        return ParsedResponse(title=title, text=text, html=html, documents=documents)
+        return ParsedResponse(
+            title=title,
+            text=text,
+            html=html,
+            documents=documents,
+            unique_id=str(payload.get("UniqueId") or payload.get("uniqueId") or ""),
+            message_type=str(payload.get("MessageType") or payload.get("messageType") or ""),
+            is_downloadable=is_downloadable,
+            intent_content_type=str(
+                intent.get("ContentType")
+                or intent.get("contentType")
+                or payload.get("ContentType")
+                or payload.get("contentType")
+                or ""
+            ),
+            downloadable_link=downloadable_link,
+        )
 
     @staticmethod
     def _as_bool(value: Any) -> bool:

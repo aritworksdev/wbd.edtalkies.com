@@ -36,6 +36,11 @@ class ChatRecord:
                 "title": self.response.title,
                 "text": self.response.text,
                 "html": self.response.html,
+                "unique_id": self.response.unique_id,
+                "message_type": self.response.message_type,
+                "is_downloadable": self.response.is_downloadable,
+                "intent_content_type": self.response.intent_content_type,
+                "downloadable_link": self.response.downloadable_link,
                 "documents": [
                     {
                         "file_name": document.file_name,
@@ -82,7 +87,18 @@ class ChatRecord:
                 text=str(response_data.get("text") or ""),
                 html=str(response_data.get("html") or ""),
                 documents=documents,
+                unique_id=str(response_data.get("unique_id") or ""),
+                message_type=str(response_data.get("message_type") or ""),
+                is_downloadable=cls._as_bool(response_data.get("is_downloadable")),
+                intent_content_type=str(response_data.get("intent_content_type") or ""),
+                downloadable_link=str(response_data.get("downloadable_link") or ""),
             ),
             created_at=created_at,
             session_id=str(data.get("session_id") or ""),
         )
+
+    @staticmethod
+    def _as_bool(value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "on"}

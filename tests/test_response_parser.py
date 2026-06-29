@@ -54,8 +54,40 @@ def test_parse_quickask_downloadable_response() -> None:
     )
 
     assert parsed.text == "Your worksheet is ready."
+    assert parsed.is_downloadable is True
+    assert parsed.downloadable_link == "https://example.test/files/relativity.pdf"
     assert parsed.documents[0].file_name == "relativity.pdf"
     assert parsed.documents[0].file_type == "PDF"
+
+
+def test_parse_quickask_response_metadata() -> None:
+    parsed = ResponseParser().parse(
+        {
+            "Title": "Slides",
+            "Response": "Your slides are ready.",
+            "MessageType": "text",
+            "UniqueId": "abc-123",
+            "IsDownloadable": "true",
+            "Intent": {"ContentType": "Slides"},
+        }
+    )
+
+    assert parsed.unique_id == "abc-123"
+    assert parsed.message_type == "text"
+    assert parsed.intent_content_type == "Slides"
+    assert parsed.is_downloadable is True
+
+
+def test_parse_image_message_type() -> None:
+    parsed = ResponseParser().parse(
+        {
+            "Title": "Poster",
+            "Response": "https://example.test/poster.png",
+            "MessageType": "poster",
+        }
+    )
+
+    assert parsed.is_image_response is True
 
 
 def test_parse_quickask_limit_response() -> None:

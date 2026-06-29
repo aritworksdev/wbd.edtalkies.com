@@ -37,6 +37,33 @@ def test_chat_store_persists_newest_first(tmp_path) -> None:
     assert reloaded[0].request_text == "What is photosynthesis?"
 
 
+def test_chat_store_preserves_response_render_metadata(tmp_path) -> None:
+    store = ChatStore(tmp_path)
+    chat = ChatRecord(
+        id="chat-1",
+        request_text="Create slides on matrices",
+        response=ParsedResponse(
+            title="Matrices",
+            text="Slides are ready.",
+            html="<p>Slides are ready.</p>",
+            unique_id="unique-1",
+            message_type="text",
+            is_downloadable=True,
+            intent_content_type="Slides",
+            downloadable_link="https://example.test/slides.pptx",
+        ),
+        created_at=datetime.now(),
+    )
+
+    store.save_chat(chat)
+    reloaded = store.load()[0]
+
+    assert reloaded.response.unique_id == "unique-1"
+    assert reloaded.response.is_downloadable is True
+    assert reloaded.response.intent_content_type == "Slides"
+    assert reloaded.response.downloadable_link == "https://example.test/slides.pptx"
+
+
 def test_chat_exporter_writes_txt_docx_and_pdf(tmp_path) -> None:
     chat = _chat("chat-1", datetime(2026, 6, 28, 10, 30, 0))
     exporter = ChatExporter(tmp_path)

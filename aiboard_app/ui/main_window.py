@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import base64
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -233,6 +234,9 @@ class MainWindow(QMainWindow):
         self._response_panel.document_open_requested.connect(self._open_document)
         self._response_panel.document_download_requested.connect(self._download_document)
         self._response_panel.export_requested.connect(self._export_current_chat)
+        self._response_panel.edit_requested.connect(self._edit_response)
+        self._response_panel.generated_download_requested.connect(self._download_generated_response)
+        self._response_panel.image_download_requested.connect(self._download_image_response)
         self._chat_history_panel.chat_selected.connect(self._open_chat)
         self._console_panel.float_requested.connect(lambda: self._float_panel(self._console_panel))
         self._console_panel.pin_requested.connect(lambda: self._dock_panel(self._console_panel, visible=True))
@@ -531,6 +535,84 @@ class MainWindow(QMainWindow):
             lambda path: QMessageBox.information(self, "Download complete", f"Saved to:\n{path}"),
             "Download failed",
         )
+
+    def _edit_response(self, unique_id: str) -> None:
+        self._log_console(f"Edit requested for response: {unique_id or 'unknown'}")
+        QMessageBox.information(
+            self,
+            "Edit response",
+            "Response editing is not implemented yet. The request was logged.",
+        )
+
+    def _download_generated_response(self, unique_id: str, file_format: str, download_url: str) -> None:
+        if not unique_id and not download_url:
+            QMessageBox.warning(self, "Download unavailable", "This response does not include a download id.")
+            self._log_console("Generated response download failed: missing UniqueId.")
+            return
+        file_format = file_format.lower()
+        file_name = self._generated_download_name(unique_id, file_format)
+        try:
+            url = download_url or self._client.generated_download_url(unique_id, file_format)
+        except Exception as exc:
+            QMessageBox.warning(self, "Download unavailable", str(exc))
+            self._log_console(f"Generated response download failed: {exc}")
+            return
+        self._log_console(f"Generated response download started: {file_format.upper()}.")
+        self._run_background(
+            f"Downloading {file_name}...",
+            lambda: self._document_manager.download(url, file_name),
+            lambda path: self._download_generated_complete(path, file_format),
+            "Download failed",
+        )
+
+    def _download_generated_complete(self, path: object, file_format: str) -> None:
+        QMessageBox.information(self, "Download complete", f"Saved to:\n{path}")
+        self._log_console(f"Generated response downloaded as {file_format.upper()}.")
+
+    def _download_image_response(self, source: str, file_name: str) -> None:
+        source = source.strip()
+        if not source:
+            QMessageBox.warning(self, "Image unavailable", "The image response was empty.")
+            self._log_console("Image download failed: empty image response.")
+            return
+        if source.startswith(("http://", "https://")):
+            self._log_console("Image response download started.")
+            self._run_background(
+                f"Downloading {file_name}...",
+                lambda: self._document_manager.download(source, file_name),
+                lambda path: self._download_image_complete(path),
+                "Image download failed",
+            )
+            return
+        try:
+            image_bytes = self._decode_image_source(source)
+            image_path = self._settings.export_dir / "downloads" / file_name
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            image_path.write_bytes(image_bytes)
+        except Exception as exc:
+            QMessageBox.warning(self, "Image download failed", str(exc))
+            self._log_console(f"Image download failed: {exc}")
+            return
+        QMessageBox.information(self, "Download complete", f"Saved to:\n{image_path}")
+        self._log_console("Image response downloaded.")
+
+    def _download_image_complete(self, path: object) -> None:
+        QMessageBox.information(self, "Download complete", f"Saved to:\n{path}")
+        self._log_console("Image response downloaded.")
+
+    @staticmethod
+    def _decode_image_source(source: str) -> bytes:
+        if "," in source and source.strip().lower().startswith("data:image/"):
+            source = source.split(",", 1)[1]
+        return base64.b64decode(source, validate=True)
+
+    @staticmethod
+    def _generated_download_name(unique_id: str, file_format: str) -> str:
+        safe_id = "".join(char for char in unique_id if char.isalnum() or char in {"-", "_"}) or "response"
+        extension = "xlsx" if file_format == "excel" else file_format
+        if extension == "calendar":
+            extension = "ics"
+        return f"EdTalkies_{safe_id}.{extension}"
 
     def _run_background(
         self,

@@ -152,3 +152,24 @@ def test_ask_uses_mock_when_base_url_is_blank() -> None:
 
     assert result["mock"] is True
     assert "Explain gravity" in result["text"]
+
+
+def test_generated_download_url_uses_unique_id_and_format() -> None:
+    settings = EdTalkiesSettings(
+        api_base_url="https://example.test",
+        api_key="",
+        ai_query_path="/quick-ask",
+        ocr_path="/ocr",
+        timeout_seconds=3,
+        retry_count=0,
+        model="default",
+        assistant_mode="teacher_board",
+        school_id="",
+        board_id="",
+        device_id="",
+        download_path="/download",
+    )
+
+    url = EdTalkiesClient(settings).generated_download_url("abc-123", "pptx")
+
+    assert url == "https://example.test/download?uniqueId=abc-123&format=pptx"

@@ -4,6 +4,7 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -81,6 +82,14 @@ class EdTalkiesClient:
                 if attempt < self._settings.retry_count:
                     time.sleep(min(2**attempt, 4))
         raise EdTalkiesError(str(last_error or "EdTalkies OCR request failed."))
+
+    def generated_download_url(self, unique_id: str, file_format: str) -> str:
+        unique_id = unique_id.strip()
+        file_format = file_format.strip().lower()
+        if not unique_id:
+            raise EdTalkiesError("Cannot download a response without a UniqueId.")
+        query = urlencode({"uniqueId": unique_id, "format": file_format})
+        return f"{self._settings.build_url(self._settings.download_path)}?{query}"
 
     def _post_json(self, path: str, payload: dict[str, Any], retry: bool = True) -> dict[str, Any]:
         last_error: Exception | None = None

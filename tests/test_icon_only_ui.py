@@ -43,7 +43,10 @@ def test_required_toolbar_icons_exist_locally() -> None:
         IconName.CONSOLE,
         IconName.CHATS,
         IconName.COPY,
+        IconName.CALENDAR,
+        IconName.EDIT_DB,
         IconName.KEYBOARD,
+        IconName.PDF,
         IconName.REDO,
         IconName.UNDO,
         IconName.PLUS_OUTLINE,
@@ -83,6 +86,46 @@ def test_response_request_panel_has_no_old_labels() -> None:
     assert "Request</h3>" not in html
     assert "class=\"request-text\"" in html
     assert "class=\"created-at\"" in html
+
+
+def test_response_panel_renders_image_and_markdown_content() -> None:
+    image = ParsedResponse(
+        "Poster",
+        "https://example.test/poster.png",
+        "",
+        message_type="poster",
+    )
+    markdown = ParsedResponse(
+        "Lesson",
+        "# Heading\n\n- Item\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n$E=mc^2$",
+        "",
+    )
+
+    image_html = ResponsePanel._render_content_html(image)
+    markdown_html = ResponsePanel._render_content_html(markdown)
+
+    assert "<img" in image_html
+    assert "https://example.test/poster.png" in image_html
+    assert "<h1>Heading</h1>" in markdown_html
+    assert "<li>Item</li>" in markdown_html
+    assert "<table>" in markdown_html
+    assert "$E=mc^2$" in markdown_html
+
+
+def test_response_panel_download_actions_follow_content_type() -> None:
+    assert ResponsePanel._download_actions("Text") == [
+        (IconName.PDF, "Download PDF", "pdf"),
+        (IconName.DOCX, "Download Word", "docx"),
+    ]
+    assert ResponsePanel._download_actions("Slides") == [
+        (IconName.PPTX, "Download PowerPoint", "pptx")
+    ]
+    assert ResponsePanel._download_actions("Sheet") == [
+        (IconName.EXCEL, "Download Excel", "xlsx")
+    ]
+    assert ResponsePanel._download_actions("Schedule") == [
+        (IconName.CALENDAR, "Download Calendar", "ics")
+    ]
 
 
 def test_chat_history_uses_short_request_preview() -> None:
