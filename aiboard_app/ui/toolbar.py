@@ -25,6 +25,7 @@ class WhiteboardToolbar(QFrame):
     keyboard_requested = Signal()
     document_requested = Signal()
     console_requested = Signal()
+    chats_requested = Signal()
     save_requested = Signal()
     exit_requested = Signal()
 
@@ -72,6 +73,12 @@ class WhiteboardToolbar(QFrame):
             self._button(IconName.ASK_AI, "Ask AI", self.ask_requested.emit, "AskAiButton"),
             self._button(IconName.KEYBOARD, "Keyboard mode", self.keyboard_requested.emit),
             self._button(IconName.UPLOAD, "Upload document", self.document_requested.emit),
+            self._button(
+                IconName.CHATS,
+                "Chats",
+                self.chats_requested.emit,
+                accessible_name="Open previous chats",
+            ),
             self._button(IconName.CONSOLE, "Console Log", self.console_requested.emit),
             self._button(IconName.UPDATE, "Save board image", self.save_requested.emit),
             self._button(IconName.CLOSE, "Exit", self.exit_requested.emit, "ExitButton"),
@@ -89,12 +96,13 @@ class WhiteboardToolbar(QFrame):
         tooltip: str,
         callback=None,  # type: ignore[no-untyped-def]
         object_name: str = "",
+        accessible_name: str = "",
     ) -> QPushButton:
         button = QPushButton()
         button.setText("")
         button.setIcon(load_icon(icon_name))
         button.setToolTip(tooltip)
-        button.setAccessibleName(tooltip)
+        button.setAccessibleName(accessible_name or tooltip)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         button.setProperty("iconOnly", True)
@@ -107,7 +115,7 @@ class WhiteboardToolbar(QFrame):
 
     def set_busy(self, busy: bool) -> None:
         for button in self._icon_buttons:
-            button.setEnabled(button.toolTip() == "Console Log" or not busy)
+            button.setEnabled(button.toolTip() in {"Console Log", "Chats"} or not busy)
 
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         self._apply_responsive_icon_size()

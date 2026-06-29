@@ -8,7 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from PySide6.QtCore import QObject, QRectF, QRunnable, QThreadPool, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QConicalGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QConicalGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -37,6 +37,7 @@ from aiboard_app.system.shutdown_manager import ShutdownManager
 from aiboard_app.ui.chat_history_panel import ChatHistoryPanel
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
 from aiboard_app.ui.floating_panel import FloatingPanelDialog, FloatingPanelHost
+from aiboard_app.ui.icon_assets import logo_path
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.theme import EdTalkiesTheme
 from aiboard_app.ui.toolbar import WhiteboardToolbar
@@ -184,7 +185,7 @@ class MainWindow(QMainWindow):
         self._chat_history_host = FloatingPanelHost(
             "Previous Chats",
             self._chat_history_panel,
-            allow_close=False,
+            close_tooltip="Close chats",
         )
         self._footer = self._build_footer()
 
@@ -224,6 +225,7 @@ class MainWindow(QMainWindow):
         self._toolbar.keyboard_requested.connect(self._keyboard_question)
         self._toolbar.document_requested.connect(self._upload_document)
         self._toolbar.console_requested.connect(self._toggle_console)
+        self._toolbar.chats_requested.connect(self._toggle_chats)
         self._toolbar.save_requested.connect(self._save_board_image)
         self._toolbar.exit_requested.connect(self._exit)
         self._canvas.content_changed.connect(self._on_canvas_content_changed)
@@ -386,6 +388,14 @@ class MainWindow(QMainWindow):
     def _ask_ai(self) -> None:
         if self._input_mode == "document" and self._current_input_text:
             self._submit_question(self._current_input_text)
+            return
+        if not self._canvas.has_content:
+            self._log_console("Ask AI cancelled: blackboard is empty.")
+            QMessageBox.information(
+                self,
+                "Nothing to ask yet",
+                "Please write something on the blackboard before asking AI.",
+            )
             return
         self._input_mode = "whiteboard"
         self._recognize_handwriting()
@@ -600,6 +610,16 @@ class MainWindow(QMainWindow):
             return
         self._console_panel.setVisible(not self._console_panel.isVisible())
 
+    def _toggle_chats(self) -> None:
+        if self._chat_history_host in self._floating_dialogs:
+            dialog = self._floating_dialogs[self._chat_history_host]
+            dialog.setVisible(not dialog.isVisible())
+            if dialog.isVisible():
+                dialog.raise_()
+                dialog.activateWindow()
+            return
+        self._chat_history_host.setVisible(not self._chat_history_host.isVisible())
+
     def _float_panel(self, host: FloatingPanelHost) -> None:
         if host in self._floating_dialogs:
             dialog = self._floating_dialogs[host]
@@ -638,7 +658,7 @@ class MainWindow(QMainWindow):
 
     def _handle_floating_panel_closed(self, host: FloatingPanelHost) -> None:
         self._floating_dialogs.pop(host, None)
-        self._dock_panel(host, visible=host is self._chat_history_host)
+        self._dock_panel(host, visible=False)
 
     def _log_console(self, message: str) -> None:
         if not hasattr(self, "_console_output"):
@@ -669,7 +689,21 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 10, 20, 10)
         logo = QLabel("e")
         logo.setObjectName("AppHeaderLogo")
-        logo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        logo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        logo_file = logo_path("edtalkies_header_logo.png")
+        if logo_file.exists():
+            pixmap = QPixmap(str(logo_file))
+            if not pixmap.isNull():
+                logo.setText("")
+                logo.setPixmap(
+                    pixmap.scaled(
+                        54,
+                        54,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+                logo.setFixedSize(60, 58)
         title = QLabel("EdTalkies Ai Blackboard")
         title.setObjectName("AppHeaderTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)

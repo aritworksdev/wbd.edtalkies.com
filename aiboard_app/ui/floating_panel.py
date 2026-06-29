@@ -13,7 +13,13 @@ class FloatingPanelHost(QFrame):
     float_requested = Signal()
     close_requested = Signal()
 
-    def __init__(self, title: str, content: QWidget, allow_close: bool = True) -> None:
+    def __init__(
+        self,
+        title: str,
+        content: QWidget,
+        allow_close: bool = True,
+        close_tooltip: str = "Close panel",
+    ) -> None:
         super().__init__()
         self.setObjectName("FloatingPanelHost")
         self._title_text = title
@@ -37,7 +43,7 @@ class FloatingPanelHost(QFrame):
 
         self._pin_button = self._icon_button(IconName.UPDATE, "Pin panel")
         self._float_button = self._icon_button(IconName.UPLOAD, "Float panel")
-        self._close_button = self._icon_button(IconName.CLOSE, "Close panel")
+        self._close_button = self._icon_button(IconName.CLOSE, close_tooltip)
         self._pin_button.clicked.connect(self.pin_requested.emit)
         self._float_button.clicked.connect(self.float_requested.emit)
         self._close_button.clicked.connect(self.close_requested.emit)

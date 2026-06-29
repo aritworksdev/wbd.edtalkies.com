@@ -135,6 +135,14 @@ class EdTalkiesTheme:
             font-family: {cls.FONT_BODY};
             font-weight: 700;
         }}
+        #ResponseCopiedLabel {{
+            color: {cls.CYAN};
+            font-family: {cls.FONT_BODY};
+            font-size: 12px;
+            font-style: italic;
+            font-weight: 700;
+            padding-right: 4px;
+        }}
         #FloatingPanelHost {{
             background: {cls.GLASS_NAVY};
             border-left: 1px solid {cls.PANEL_LINE};

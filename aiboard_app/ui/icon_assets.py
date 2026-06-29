@@ -8,11 +8,14 @@ from PySide6.QtGui import QIcon
 LOGGER = logging.getLogger(__name__)
 
 ICON_DIR = Path(__file__).resolve().parents[2] / "Assets" / "Icons"
+LOGO_DIR = Path(__file__).resolve().parents[2] / "Assets" / "Logo"
 
 
 class IconName:
     ASK_AI = "__ed_icon_ai2.png"
+    CHATS = "__ed_icon_chats.png"
     CLOSE = "__ed_icon_close_window.png"
+    COPY = "__ed_icon_copy.png"
     COLOR_WHEEL = "__ed_icon_color_wheel.png"
     CONSOLE = "__ed_icon_console_white.png"
     DELETE = "__ed_icon_delete.png"
@@ -31,6 +34,10 @@ class IconName:
 
 def icon_path(file_name: str) -> Path:
     return ICON_DIR / file_name
+
+
+def logo_path(file_name: str) -> Path:
+    return LOGO_DIR / file_name
 
 
 def load_icon(file_name: str, fallback: str = IconName.EDIT) -> QIcon:

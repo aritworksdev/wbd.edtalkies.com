@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt, Signal, QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QSize, Qt, Signal, QTimer, QUrl
+from PySide6.QtGui import QGuiApplication, QTextDocument
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -42,13 +42,25 @@ class ResponsePanel(QFrame):
         header = QHBoxLayout()
         self._title = QLabel("EdTalkies Response")
         self._title.setObjectName("ResponseTitle")
-        copy_button = self._icon_button(IconName.UPDATE, "Copy response", small=True)
+        self._copied_label = QLabel("")
+        self._copied_label.setObjectName("ResponseCopiedLabel")
+        self._copied_label.hide()
+        self._copied_timer = QTimer(self)
+        self._copied_timer.setSingleShot(True)
+        self._copied_timer.timeout.connect(self._copied_label.hide)
+        copy_button = self._icon_button(
+            IconName.COPY,
+            "Copy response",
+            small=True,
+            accessible_name="Copy AI response",
+        )
         copy_button.clicked.connect(self._copy_response)
         save_button = self._icon_button(IconName.UPDATE, "Save response", small=True)
         save_button.clicked.connect(self._save_response)
         close_button = self._icon_button(IconName.CLOSE, "Close response panel", small=True)
         close_button.clicked.connect(self.close_requested.emit)
         header.addWidget(self._title, 1)
+        header.addWidget(self._copied_label)
         header.addWidget(copy_button)
         header.addWidget(save_button)
         header.addWidget(close_button)
@@ -133,15 +145,11 @@ class ResponsePanel(QFrame):
                         child.widget().deleteLater()
 
     def _copy_response(self) -> None:
-        if self._current_chat is not None:
-            text = (
-                f"Created: {self._current_chat.created_at:%Y-%m-%d %H:%M:%S}\n\n"
-                f"Request:\n{self._current_chat.request_text}\n\n"
-                f"Response:\n{self._current_response.text or self._current_response.html}"
-            )
-        else:
-            text = self._current_response.text or self._current_response.html
+        text = self._current_response.text or self._html_to_plain_text(self._current_response.html)
         QGuiApplication.clipboard().setText(text)
+        self._copied_label.setText("Copied")
+        self._copied_label.show()
+        self._copied_timer.start(1600)
 
     def _save_response(self) -> None:
         file_name, selected_filter = QFileDialog.getSaveFileName(
@@ -168,12 +176,18 @@ class ResponsePanel(QFrame):
         self._apply_icon_sizes()
         super().resizeEvent(event)
 
-    def _icon_button(self, icon_name: str, tooltip: str, small: bool = False) -> QPushButton:
+    def _icon_button(
+        self,
+        icon_name: str,
+        tooltip: str,
+        small: bool = False,
+        accessible_name: str = "",
+    ) -> QPushButton:
         button = QPushButton()
         button.setText("")
         button.setIcon(load_icon(icon_name))
         button.setToolTip(tooltip)
-        button.setAccessibleName(tooltip)
+        button.setAccessibleName(accessible_name or tooltip)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         button.setProperty("iconOnly", True)
@@ -204,9 +218,8 @@ class ResponsePanel(QFrame):
         if chat is not None:
             chat_header = f"""
 <section class="chat-meta">
-  <div><strong>Created:</strong> {chat.created_at:%Y-%m-%d %H:%M:%S}</div>
-  <h3>Recognized Text / Request</h3>
-  <p>{ResponsePanel._escape(chat.request_text).replace(chr(10), '<br>')}</p>
+  <div class="request-text">{ResponsePanel._escape(chat.request_text).replace(chr(10), '<br>')}</div>
+  <div class="created-at">Created: {chat.created_at:%Y-%m-%d %I:%M %p}</div>
 </section>
 """
         return f"""
@@ -221,8 +234,9 @@ class ResponsePanel(QFrame):
   <style>
     body {{ font-family: {EdTalkiesTheme.FONT_BODY}; font-size: 22px; line-height: 1.5; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
     body {{ background: {EdTalkiesTheme.RESPONSE_BG}; }}
-    .chat-meta {{ background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); border-left: 4px solid {EdTalkiesTheme.PURPLE}; border-radius: 12px; padding: 12px; margin-bottom: 16px; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
-    .chat-meta h3 {{ margin-bottom: 6px; }}
+    .chat-meta {{ background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); border-left: 4px solid {EdTalkiesTheme.PURPLE}; border-radius: 12px; padding: 14px; margin-bottom: 16px; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
+    .request-text {{ font-style: italic; font-size: 23px; }}
+    .created-at {{ color: {EdTalkiesTheme.TEXT_SOFT}; font-size: 13px; font-style: italic; text-align: right; margin-top: 12px; }}
     table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
     th, td {{ border: 1px solid rgba(255, 255, 255, 0.22); padding: 8px 10px; text-align: left; }}
     th {{ background: rgba(255, 255, 255, 0.10); }}
@@ -244,3 +258,11 @@ class ResponsePanel(QFrame):
             .replace('"', "&quot;")
             .replace("'", "&#x27;")
         )
+
+    @staticmethod
+    def _html_to_plain_text(value: str) -> str:
+        if not value:
+            return ""
+        document = QTextDocument()
+        document.setHtml(value)
+        return document.toPlainText()

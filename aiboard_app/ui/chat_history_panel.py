@@ -43,7 +43,13 @@ class ChatHistoryPanel(QFrame):
     @staticmethod
     def _item_text(record: ChatRecord) -> str:
         created = record.created_at.strftime("%m/%d/%Y %I:%M %p")
-        response = record.response_preview
-        if response:
-            return f"💬 {record.title}\n{created}\n{response}"
-        return f"💬 {record.title}\n{created}"
+        preview = ChatHistoryPanel._short_preview(record.request_text or record.response_preview)
+        return f"{preview}\n{created}"
+
+    @staticmethod
+    def _short_preview(value: str) -> str:
+        words = value.split()
+        if not words:
+            return "EdTalkies chat"
+        preview = " ".join(words[:4])
+        return preview + ("..." if len(words) > 4 else "")
