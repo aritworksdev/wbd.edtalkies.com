@@ -26,6 +26,15 @@ class FakeSession:
         return FakeResponse()
 
 
+class TimeoutSession:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def post(self, url: str, **kwargs) -> FakeResponse:  # type: ignore[no-untyped-def]
+        self.calls += 1
+        raise requests.ReadTimeout("read timed out")
+
+
 def test_ask_posts_configured_payload() -> None:
     settings = EdTalkiesSettings(
         api_base_url="https://example.test",
@@ -94,6 +103,34 @@ def test_ask_allows_quickask_context_overrides() -> None:
     assert fake_session.payload["Season"] == "Grade 6"
     assert fake_session.payload["Genre"] == "Biology"
     assert fake_session.payload["ContentSource"] == "CBSE"
+
+
+def test_ask_does_not_retry_non_idempotent_quickask_timeout() -> None:
+    settings = EdTalkiesSettings(
+        api_base_url="https://example.test",
+        api_key="",
+        ai_query_path="/quick-ask",
+        ocr_path="/ocr",
+        timeout_seconds=3,
+        retry_count=2,
+        model="default",
+        assistant_mode="teacher_board",
+        school_id="",
+        board_id="",
+        device_id="",
+    )
+    client = EdTalkiesClient(settings)
+    fake_session = TimeoutSession()
+    client._session = fake_session  # type: ignore[attr-defined]
+
+    try:
+        client.ask(AiQuery(text="Create a presentation about matrices"))
+    except Exception as exc:
+        assert "read timed out" in str(exc)
+    else:
+        raise AssertionError("Expected timeout error")
+
+    assert fake_session.calls == 1
 
 
 def test_ask_uses_mock_when_base_url_is_blank() -> None:

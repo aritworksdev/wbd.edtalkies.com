@@ -118,7 +118,7 @@ EDTALKIES_API_BASE_URL=https://ramovies.app/edtalkies
 EDTALKIES_API_KEY=
 EDTALKIES_AI_QUERY_PATH=/api/AiBotTalkies/QuickAskAiTeacherAsync
 EDTALKIES_OCR_PATH=/api/ocr/handwriting
-EDTALKIES_TIMEOUT_SECONDS=30
+EDTALKIES_TIMEOUT_SECONDS=120
 EDTALKIES_RETRY_COUNT=2
 EDTALKIES_QUICKASK_CHANNEL=WEB
 EDTALKIES_QUICKASK_PHONE=
@@ -242,7 +242,7 @@ The credential JSON must contain `type`, `project_id`, `private_key_id`,
 - Document upload and editable text extraction for PDF, DOCX, text, Markdown,
   HTML, images, and scanned PDFs
 - Background API and download operations so the UI remains responsive
-- Configurable EdTalkies API client with timeout, retries, IDs, and mock mode
+- Configurable EdTalkies API client with timeout, OCR retries, IDs, and mock mode
 - Rich text/HTML response panel with scrolling, copy, save, and document actions
 - Safe Windows quit, shutdown, and restart behavior with confirmation
 - Placeholder voice, camera, and gesture providers

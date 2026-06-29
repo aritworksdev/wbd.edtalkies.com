@@ -139,7 +139,7 @@ def load_settings(env_file: str | Path | None = None) -> AppSettings:
                 "/api/AiBotTalkies/QuickAskAiTeacherAsync",
             ),
             ocr_path=os.getenv("EDTALKIES_OCR_PATH", "/api/ocr/handwriting"),
-            timeout_seconds=_int_env("EDTALKIES_TIMEOUT_SECONDS", 30),
+            timeout_seconds=_int_env("EDTALKIES_TIMEOUT_SECONDS", 120),
             retry_count=_int_env("EDTALKIES_RETRY_COUNT", 2),
             model=os.getenv("EDTALKIES_MODEL", "default"),
             assistant_mode=os.getenv("EDTALKIES_ASSISTANT_MODE", "teacher_board"),

@@ -47,7 +47,7 @@ class EdTalkiesClient:
                 context.get("ContentSource") or self._settings.quick_ask_content_source
             ),
         }
-        return self._post_json(self._settings.ai_query_path, payload)
+        return self._post_json(self._settings.ai_query_path, payload, retry=False)
 
     def recognize_handwriting(self, image_bytes: bytes, mime_type: str = "image/png") -> dict[str, Any]:
         if not image_bytes:
@@ -82,9 +82,10 @@ class EdTalkiesClient:
                     time.sleep(min(2**attempt, 4))
         raise EdTalkiesError(str(last_error or "EdTalkies OCR request failed."))
 
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post_json(self, path: str, payload: dict[str, Any], retry: bool = True) -> dict[str, Any]:
         last_error: Exception | None = None
-        for attempt in range(self._settings.retry_count + 1):
+        retry_count = self._settings.retry_count if retry else 0
+        for attempt in range(retry_count + 1):
             try:
                 response = self._session.post(
                     self._settings.build_url(path),
@@ -96,7 +97,7 @@ class EdTalkiesClient:
             except (requests.RequestException, EdTalkiesError) as exc:
                 last_error = exc
                 LOGGER.warning("EdTalkies API attempt %s failed: %s", attempt + 1, exc)
-                if attempt < self._settings.retry_count:
+                if attempt < retry_count:
                     time.sleep(min(2**attempt, 4))
         raise EdTalkiesError(str(last_error or "EdTalkies request failed."))
 
