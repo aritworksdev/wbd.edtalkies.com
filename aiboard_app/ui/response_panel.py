@@ -194,9 +194,9 @@ class ResponsePanel(QFrame):
                 )
             )
             self._actions.addWidget(image_button)
-        elif response.is_downloadable:
-            if self._is_generated_document_content(response.intent_content_type):
-                open_format = self._primary_download_format(response.intent_content_type)
+        elif self._is_generated_document_content(response.intent_content_type):
+            open_format = self._primary_download_format(response.intent_content_type)
+            if response.unique_id or response.downloadable_link:
                 open_button = self._icon_button(
                     IconName.UPDATE,
                     "Open document",
@@ -208,6 +208,24 @@ class ResponsePanel(QFrame):
                         self.generated_open_requested.emit(response.unique_id, fmt, response.downloadable_link)
                 )
                 self._actions.addWidget(open_button)
+            if response.is_downloadable:
+                for icon_name, tooltip, file_format in self._download_actions(response.intent_content_type):
+                    button = self._icon_button(
+                        icon_name,
+                        tooltip,
+                        small=True,
+                        accessible_name=tooltip,
+                    )
+                    button.clicked.connect(
+                        lambda checked=False, fmt=file_format:
+                            self.generated_download_requested.emit(
+                                response.unique_id,
+                                fmt,
+                                response.downloadable_link,
+                            )
+                    )
+                    self._actions.addWidget(button)
+        elif response.is_downloadable:
             for icon_name, tooltip, file_format in self._download_actions(response.intent_content_type):
                 button = self._icon_button(
                     icon_name,
@@ -306,7 +324,7 @@ class ResponsePanel(QFrame):
         content = response.text or response.html
         if response.is_image_response:
             return ResponsePanel._image_html(content)
-        if response.is_downloadable and ResponsePanel._is_generated_document_content(response.intent_content_type):
+        if ResponsePanel._is_generated_document_content(response.intent_content_type):
             return ResponsePanel._generated_document_html(response.intent_content_type)
         if response.text.strip():
             return ResponsePanel._markdown_to_html(response.text)

@@ -137,7 +137,7 @@ def test_generated_document_response_hides_raw_text() -> None:
         "Create a presentation slide show on matrices.",
         "",
         unique_id="deck-1",
-        is_downloadable=True,
+        is_downloadable=False,
         intent_content_type="AiContentType.Slides",
     )
 
@@ -145,6 +145,25 @@ def test_generated_document_response_hides_raw_text() -> None:
 
     assert "Slides is ready" in html
     assert "Create a presentation slide show on matrices." not in html
+
+
+def test_generated_document_response_open_does_not_require_downloadable_flag() -> None:
+    _app()
+    panel = ResponsePanel()
+    response = ParsedResponse(
+        "Sheet",
+        "Generated spreadsheet content should not render as text.",
+        "",
+        unique_id="sheet-1",
+        is_downloadable=False,
+        intent_content_type="Sheet",
+    )
+
+    panel.show_response(response)
+    tooltips = {button.toolTip() for button in panel.findChildren(QPushButton)}
+
+    assert "Open document" in tooltips
+    assert "Download Excel" not in tooltips
 
 
 def test_generated_document_response_shows_open_and_download_actions() -> None:
