@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QLabel, QListWidget, QListWidgetItem, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QListWidget, QListWidgetItem, QVBoxLayout
 
 from aiboard_app.chat.chat_record import ChatRecord
 
@@ -17,17 +17,14 @@ class ChatHistoryPanel(QFrame):
         self._records: list[ChatRecord] = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 12, 10, 12)
+        layout.setContentsMargins(10, 10, 10, 12)
         layout.setSpacing(8)
 
-        title = QLabel("Previous Chats")
-        title.setObjectName("ChatHistoryTitle")
         self._list = QListWidget()
         self._list.setObjectName("ChatHistoryList")
         self._list.itemActivated.connect(self._emit_selected)
         self._list.itemClicked.connect(self._emit_selected)
 
-        layout.addWidget(title)
         layout.addWidget(self._list, 1)
 
     def set_chats(self, records: list[ChatRecord]) -> None:

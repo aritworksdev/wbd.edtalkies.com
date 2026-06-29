@@ -96,3 +96,29 @@ def test_toolbar_is_embedded_in_header(tmp_path) -> None:
     )
 
     assert window._toolbar.parentWidget() is window._header
+
+
+def test_console_and_chat_panels_can_float_and_dock(tmp_path) -> None:
+    _app()
+    settings = _settings(tmp_path)
+    window = MainWindow(
+        settings=settings,
+        client=FakeClient(),
+        recognizer=FakeRecognizer(),
+        response_parser=ResponseParser(),
+        prompt_builder=PromptBuilder(),
+        document_manager=DocumentManager(tmp_path),
+        shutdown_manager=ShutdownManager(settings),
+    )
+
+    window._float_panel(window._console_panel)
+    assert window._console_panel in window._floating_dialogs
+    window._dock_panel(window._console_panel, visible=True)
+    assert window._console_panel not in window._floating_dialogs
+    assert window._body_layout.indexOf(window._console_panel) >= 0
+
+    window._float_panel(window._chat_history_host)
+    assert window._chat_history_host in window._floating_dialogs
+    window._hide_panel(window._chat_history_host)
+    assert window._chat_history_host not in window._floating_dialogs
+    assert window._body_layout.indexOf(window._chat_history_host) >= 0

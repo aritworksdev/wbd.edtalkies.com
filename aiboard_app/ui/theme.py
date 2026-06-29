@@ -21,8 +21,8 @@ class EdTalkiesTheme:
     GREEN = "#10a37f"
     GREEN_HOVER = "#0e8e6d"
     WARNING = "#f59e0b"
-    RESPONSE_BG = "#f8fafc"
-    RESPONSE_TEXT = "#111827"
+    RESPONSE_BG = GLASS_NAVY
+    RESPONSE_TEXT = TEXT
 
     @classmethod
     def app_stylesheet(cls) -> str:
@@ -106,7 +106,7 @@ class EdTalkiesTheme:
         }}
         #ResponsePanel {{
             background: {cls.RESPONSE_BG};
-            border-left: 1px solid #dbe3ef;
+            border-left: 1px solid {cls.PANEL_LINE};
             color: {cls.RESPONSE_TEXT};
         }}
         #ResponsePanel QPushButton {{
@@ -119,10 +119,10 @@ class EdTalkiesTheme:
             font-weight: 700;
         }}
         #ResponsePanel QPushButton:hover {{
-            background: rgba(16, 163, 127, 0.12);
+            background: rgba(255, 255, 255, 0.10);
         }}
         #ResponsePanel QPushButton:focus {{
-            background: rgba(30, 144, 255, 0.12);
+            background: rgba(255, 255, 255, 0.08);
         }}
         #ResponseTitle {{
             font-family: {cls.FONT_DISPLAY};
@@ -135,15 +135,39 @@ class EdTalkiesTheme:
             font-family: {cls.FONT_BODY};
             font-weight: 700;
         }}
-        #ConsoleLogPanel {{
+        #FloatingPanelHost {{
             background: {cls.GLASS_NAVY};
             border-left: 1px solid {cls.PANEL_LINE};
         }}
-        #ConsoleLogTitle {{
+        #FloatingPanelDialog {{
+            background: {cls.GLASS_NAVY};
+        }}
+        #FloatingPanelHeader {{
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid {cls.PANEL_LINE};
+        }}
+        #FloatingPanelTitle {{
             color: {cls.TEXT};
             font-family: {cls.FONT_DISPLAY};
             font-size: 18px;
             font-weight: 800;
+        }}
+        #FloatingPanelHost QPushButton {{
+            background: transparent;
+            color: {cls.TEXT};
+            border: 0;
+            border-radius: 8px;
+            padding: 3px;
+        }}
+        #FloatingPanelHost QPushButton:hover {{
+            background: rgba(255, 255, 255, 0.10);
+        }}
+        #FloatingPanelHost QPushButton:focus {{
+            background: rgba(255, 255, 255, 0.08);
+        }}
+        #ConsoleLogContent {{
+            background: transparent;
+            border: 0;
         }}
         #ConsoleLogOutput {{
             background: rgba(0, 0, 0, 0.72);
@@ -155,14 +179,8 @@ class EdTalkiesTheme:
             font-size: 12px;
         }}
         #ChatHistoryPanel {{
-            background: {cls.GLASS_NAVY};
-            border-left: 1px solid {cls.PANEL_LINE};
-        }}
-        #ChatHistoryTitle {{
-            color: {cls.TEXT};
-            font-family: {cls.FONT_DISPLAY};
-            font-size: 18px;
-            font-weight: 800;
+            background: transparent;
+            border: 0;
         }}
         #ChatHistoryList {{
             background: transparent;

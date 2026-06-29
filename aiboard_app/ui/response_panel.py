@@ -220,13 +220,14 @@ class ResponsePanel(QFrame):
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
     body {{ font-family: {EdTalkiesTheme.FONT_BODY}; font-size: 22px; line-height: 1.5; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
-    .chat-meta {{ background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid {EdTalkiesTheme.PURPLE}; border-radius: 12px; padding: 12px; margin-bottom: 16px; }}
+    body {{ background: {EdTalkiesTheme.RESPONSE_BG}; }}
+    .chat-meta {{ background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); border-left: 4px solid {EdTalkiesTheme.PURPLE}; border-radius: 12px; padding: 12px; margin-bottom: 16px; color: {EdTalkiesTheme.RESPONSE_TEXT}; }}
     .chat-meta h3 {{ margin-bottom: 6px; }}
     table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
-    th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
-    th {{ background: #eef2f7; }}
-    code, pre {{ background: #eef2ff; border-radius: 4px; padding: 2px 5px; }}
-    a {{ color: {EdTalkiesTheme.BLUE}; }}
+    th, td {{ border: 1px solid rgba(255, 255, 255, 0.22); padding: 8px 10px; text-align: left; }}
+    th {{ background: rgba(255, 255, 255, 0.10); }}
+    code, pre {{ background: rgba(0, 0, 0, 0.42); border-radius: 4px; padding: 2px 5px; }}
+    a {{ color: {EdTalkiesTheme.CYAN}; }}
     img {{ max-width: 100%; height: auto; }}
   </style>
 </head>

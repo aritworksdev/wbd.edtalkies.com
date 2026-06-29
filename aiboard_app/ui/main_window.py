@@ -36,6 +36,7 @@ from aiboard_app.recognition.ocr_result import OcrResult
 from aiboard_app.system.shutdown_manager import ShutdownManager
 from aiboard_app.ui.chat_history_panel import ChatHistoryPanel
 from aiboard_app.ui.dialogs import RecognitionConfirmDialog
+from aiboard_app.ui.floating_panel import FloatingPanelDialog, FloatingPanelHost
 from aiboard_app.ui.response_panel import ResponsePanel
 from aiboard_app.ui.theme import EdTalkiesTheme
 from aiboard_app.ui.toolbar import WhiteboardToolbar
@@ -153,6 +154,7 @@ class MainWindow(QMainWindow):
         self._chat_store = ChatStore(settings.export_dir)
         self._chat_exporter = ChatExporter(settings.export_dir)
         self._chats = self._chat_store.load()
+        self._floating_dialogs: dict[FloatingPanelHost, FloatingPanelDialog] = {}
 
         self.setWindowTitle("AiBoard App")
         self.setObjectName("AiBoardMainWindow")
@@ -174,19 +176,26 @@ class MainWindow(QMainWindow):
         self._canvas = WhiteboardCanvas()
         self._response_panel = ResponsePanel()
         self._response_panel.hide()
-        self._console_panel, self._console_output = self._build_console_panel()
+        console_content, self._console_output = self._build_console_panel()
+        self._console_panel = FloatingPanelHost("Console Log", console_content)
         self._console_panel.hide()
         self._chat_history_panel = ChatHistoryPanel()
         self._chat_history_panel.set_chats(self._chats)
+        self._chat_history_host = FloatingPanelHost(
+            "Previous Chats",
+            self._chat_history_panel,
+            allow_close=False,
+        )
         self._footer = self._build_footer()
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
+        self._body_layout = body
         body.addWidget(self._canvas, 1)
         body.addWidget(self._response_panel)
         body.addWidget(self._console_panel)
-        body.addWidget(self._chat_history_panel)
+        body.addWidget(self._chat_history_host)
 
         root_layout.addWidget(self._header)
         root_layout.addLayout(body, 1)
@@ -223,6 +232,12 @@ class MainWindow(QMainWindow):
         self._response_panel.document_download_requested.connect(self._download_document)
         self._response_panel.export_requested.connect(self._export_current_chat)
         self._chat_history_panel.chat_selected.connect(self._open_chat)
+        self._console_panel.float_requested.connect(lambda: self._float_panel(self._console_panel))
+        self._console_panel.pin_requested.connect(lambda: self._dock_panel(self._console_panel, visible=True))
+        self._console_panel.close_requested.connect(lambda: self._hide_panel(self._console_panel))
+        self._chat_history_host.float_requested.connect(lambda: self._float_panel(self._chat_history_host))
+        self._chat_history_host.pin_requested.connect(lambda: self._dock_panel(self._chat_history_host, visible=True))
+        self._chat_history_host.close_requested.connect(lambda: self._hide_panel(self._chat_history_host))
 
     def _recognize_handwriting(self) -> None:
         if self._recognition_in_progress:
@@ -576,7 +591,54 @@ class MainWindow(QMainWindow):
         self._current_input_text = ""
 
     def _toggle_console(self) -> None:
+        if self._console_panel in self._floating_dialogs:
+            dialog = self._floating_dialogs[self._console_panel]
+            dialog.setVisible(not dialog.isVisible())
+            if dialog.isVisible():
+                dialog.raise_()
+                dialog.activateWindow()
+            return
         self._console_panel.setVisible(not self._console_panel.isVisible())
+
+    def _float_panel(self, host: FloatingPanelHost) -> None:
+        if host in self._floating_dialogs:
+            dialog = self._floating_dialogs[host]
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+        self._body_layout.removeWidget(host)
+        host.setParent(None)
+        host.set_floating(True)
+        dialog = FloatingPanelDialog(host, self)
+        dialog.panel_closed.connect(self._handle_floating_panel_closed)
+        self._floating_dialogs[host] = dialog
+        dialog.show()
+
+    def _dock_panel(self, host: FloatingPanelHost, visible: bool = True) -> None:
+        dialog = self._floating_dialogs.pop(host, None)
+        if dialog is not None:
+            dialog.panel_closed.disconnect(self._handle_floating_panel_closed)
+            dialog.detach_host()
+            dialog.close()
+        if host.parentWidget() is not self.centralWidget():
+            host.setParent(None)
+        host.set_floating(False)
+        if self._body_layout.indexOf(host) < 0:
+            self._body_layout.addWidget(host)
+        host.setVisible(visible)
+
+    def _hide_panel(self, host: FloatingPanelHost) -> None:
+        dialog = self._floating_dialogs.pop(host, None)
+        if dialog is not None:
+            dialog.panel_closed.disconnect(self._handle_floating_panel_closed)
+            dialog.detach_host()
+            dialog.close()
+        self._dock_panel(host, visible=False)
+
+    def _handle_floating_panel_closed(self, host: FloatingPanelHost) -> None:
+        self._floating_dialogs.pop(host, None)
+        self._dock_panel(host, visible=host is self._chat_history_host)
 
     def _log_console(self, message: str) -> None:
         if not hasattr(self, "_console_output"):
@@ -619,21 +681,18 @@ class MainWindow(QMainWindow):
 
     def _build_console_panel(self) -> tuple[QFrame, QPlainTextEdit]:
         panel = QFrame()
-        panel.setObjectName("ConsoleLogPanel")
+        panel.setObjectName("ConsoleLogContent")
         panel.setMinimumWidth(360)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(12, 10, 12, 12)
         layout.setSpacing(8)
 
-        title = QLabel("Console Log")
-        title.setObjectName("ConsoleLogTitle")
         output = QPlainTextEdit()
         output.setObjectName("ConsoleLogOutput")
         output.setReadOnly(True)
         output.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         output.setPlaceholderText("Runtime logs will appear here.")
 
-        layout.addWidget(title)
         layout.addWidget(output, 1)
         return panel, output
 
