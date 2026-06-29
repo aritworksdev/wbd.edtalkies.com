@@ -236,6 +236,7 @@ class MainWindow(QMainWindow):
         self._response_panel.export_requested.connect(self._export_current_chat)
         self._response_panel.edit_requested.connect(self._edit_response)
         self._response_panel.generated_download_requested.connect(self._download_generated_response)
+        self._response_panel.generated_open_requested.connect(self._open_generated_response)
         self._response_panel.image_download_requested.connect(self._download_image_response)
         self._chat_history_panel.chat_selected.connect(self._open_chat)
         self._console_panel.float_requested.connect(lambda: self._float_panel(self._console_panel))
@@ -545,6 +546,18 @@ class MainWindow(QMainWindow):
         )
 
     def _download_generated_response(self, unique_id: str, file_format: str, download_url: str) -> None:
+        self._fetch_generated_response(unique_id, file_format, download_url, open_after_download=False)
+
+    def _open_generated_response(self, unique_id: str, file_format: str, download_url: str) -> None:
+        self._fetch_generated_response(unique_id, file_format, download_url, open_after_download=True)
+
+    def _fetch_generated_response(
+        self,
+        unique_id: str,
+        file_format: str,
+        download_url: str,
+        open_after_download: bool,
+    ) -> None:
         if not unique_id and not download_url:
             QMessageBox.warning(self, "Download unavailable", "This response does not include a download id.")
             self._log_console("Generated response download failed: missing UniqueId.")
@@ -552,20 +565,30 @@ class MainWindow(QMainWindow):
         file_format = file_format.lower()
         file_name = self._generated_download_name(unique_id, file_format)
         try:
-            url = download_url or self._client.generated_download_url(unique_id, file_format)
+            url = self._client.generated_download_url(unique_id, file_format) if unique_id else download_url
         except Exception as exc:
             QMessageBox.warning(self, "Download unavailable", str(exc))
             self._log_console(f"Generated response download failed: {exc}")
             return
-        self._log_console(f"Generated response download started: {file_format.upper()}.")
+        action = "open" if open_after_download else "download"
+        self._log_console(f"Generated response {action} started: {file_format.upper()}.")
         self._run_background(
             f"Downloading {file_name}...",
             lambda: self._document_manager.download(url, file_name),
-            lambda path: self._download_generated_complete(path, file_format),
+            lambda path: self._download_generated_complete(path, file_format, open_after_download),
             "Download failed",
         )
 
-    def _download_generated_complete(self, path: object, file_format: str) -> None:
+    def _download_generated_complete(self, path: object, file_format: str, open_after_download: bool) -> None:
+        if open_after_download:
+            try:
+                self._document_manager.open_file(path)
+            except Exception as exc:
+                QMessageBox.warning(self, "Open failed", str(exc))
+                self._log_console(f"Generated response open failed: {exc}")
+                return
+            self._log_console(f"Generated response opened as {file_format.upper()}.")
+            return
         QMessageBox.information(self, "Download complete", f"Saved to:\n{path}")
         self._log_console(f"Generated response downloaded as {file_format.upper()}.")
 

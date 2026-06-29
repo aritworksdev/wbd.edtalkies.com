@@ -126,6 +126,44 @@ def test_response_panel_download_actions_follow_content_type() -> None:
     assert ResponsePanel._download_actions("Schedule") == [
         (IconName.CALENDAR, "Download Calendar", "ics")
     ]
+    assert ResponsePanel._download_actions("AiContentType.Slides") == [
+        (IconName.PPTX, "Download PowerPoint", "pptx")
+    ]
+
+
+def test_generated_document_response_hides_raw_text() -> None:
+    response = ParsedResponse(
+        "Slides",
+        "Create a presentation slide show on matrices.",
+        "",
+        unique_id="deck-1",
+        is_downloadable=True,
+        intent_content_type="AiContentType.Slides",
+    )
+
+    html = ResponsePanel._render_content_html(response)
+
+    assert "Slides is ready" in html
+    assert "Create a presentation slide show on matrices." not in html
+
+
+def test_generated_document_response_shows_open_and_download_actions() -> None:
+    _app()
+    panel = ResponsePanel()
+    response = ParsedResponse(
+        "Slides",
+        "Slides are ready.",
+        "",
+        unique_id="deck-1",
+        is_downloadable=True,
+        intent_content_type="Slides",
+    )
+
+    panel.show_response(response)
+    tooltips = {button.toolTip() for button in panel.findChildren(QPushButton)}
+
+    assert "Open document" in tooltips
+    assert "Download PowerPoint" in tooltips
 
 
 def test_chat_history_uses_short_request_preview() -> None:
@@ -140,7 +178,8 @@ def test_chat_history_uses_short_request_preview() -> None:
 
 
 class FakeClient:
-    pass
+    def generated_download_url(self, unique_id: str, file_format: str) -> str:
+        return f"https://example.test/download?uniqueId={unique_id}&format={file_format}"
 
 
 class FakeRecognizer:
@@ -227,3 +266,36 @@ def test_ask_ai_empty_blackboard_does_not_start_ocr(tmp_path, monkeypatch) -> No
 
     assert not window._recognition_in_progress
     assert window._busy_count == 0
+
+
+def test_generated_download_prefers_unique_id_format_url(tmp_path, monkeypatch) -> None:
+    _app()
+    settings = _settings(tmp_path)
+    window = MainWindow(
+        settings=settings,
+        client=FakeClient(),
+        recognizer=FakeRecognizer(),
+        response_parser=ResponseParser(),
+        prompt_builder=PromptBuilder(),
+        document_manager=DocumentManager(tmp_path),
+        shutdown_manager=ShutdownManager(settings),
+    )
+    captured: dict[str, str] = {}
+
+    def fake_run_background(message, task, on_success, error_title, show_progress=True, on_complete=None):  # type: ignore[no-untyped-def]
+        captured["message"] = message
+        result = task()
+        on_success(result)
+
+    monkeypatch.setattr(window, "_run_background", fake_run_background)
+    monkeypatch.setattr(window, "_download_generated_complete", lambda path, fmt, open_doc: None)
+    monkeypatch.setattr(
+        window._document_manager,
+        "download",
+        lambda url, file_name: captured.update({"url": url, "file_name": file_name}) or tmp_path / file_name,
+    )
+
+    window._download_generated_response("deck-1", "pptx", "https://example.test/wrong-format")
+
+    assert captured["url"] == "https://example.test/download?uniqueId=deck-1&format=pptx"
+    assert captured["file_name"] == "EdTalkies_deck-1.pptx"

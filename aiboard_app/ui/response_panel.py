@@ -34,6 +34,7 @@ class ResponsePanel(QFrame):
     export_requested = Signal(str)
     edit_requested = Signal(str)
     generated_download_requested = Signal(str, str, str)
+    generated_open_requested = Signal(str, str, str)
     image_download_requested = Signal(str, str)
 
     def __init__(self) -> None:
@@ -194,6 +195,19 @@ class ResponsePanel(QFrame):
             )
             self._actions.addWidget(image_button)
         elif response.is_downloadable:
+            if self._is_generated_document_content(response.intent_content_type):
+                open_format = self._primary_download_format(response.intent_content_type)
+                open_button = self._icon_button(
+                    IconName.UPDATE,
+                    "Open document",
+                    small=True,
+                    accessible_name="Open generated document",
+                )
+                open_button.clicked.connect(
+                    lambda checked=False, fmt=open_format:
+                        self.generated_open_requested.emit(response.unique_id, fmt, response.downloadable_link)
+                )
+                self._actions.addWidget(open_button)
             for icon_name, tooltip, file_format in self._download_actions(response.intent_content_type):
                 button = self._icon_button(
                     icon_name,
@@ -211,7 +225,7 @@ class ResponsePanel(QFrame):
 
     @staticmethod
     def _download_actions(content_type: str) -> list[tuple[str, str, str]]:
-        normalized = content_type.strip().lower()
+        normalized = ResponsePanel._normalize_content_type(content_type)
         if normalized in {"text", "lesson"}:
             return [
                 (IconName.PDF, "Download PDF", "pdf"),
@@ -224,6 +238,28 @@ class ResponsePanel(QFrame):
         if normalized == "schedule":
             return [(IconName.CALENDAR, "Download Calendar", "ics")]
         return []
+
+    @staticmethod
+    def _is_generated_document_content(content_type: str) -> bool:
+        return ResponsePanel._normalize_content_type(content_type) in {"slides", "sheet", "schedule"}
+
+    @staticmethod
+    def _primary_download_format(content_type: str) -> str:
+        normalized = ResponsePanel._normalize_content_type(content_type)
+        if normalized == "slides":
+            return "pptx"
+        if normalized == "sheet":
+            return "xlsx"
+        if normalized == "schedule":
+            return "ics"
+        return "pdf"
+
+    @staticmethod
+    def _normalize_content_type(content_type: str) -> str:
+        normalized = content_type.strip().lower()
+        if "." in normalized:
+            normalized = normalized.rsplit(".", 1)[-1]
+        return normalized
 
     def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         self._apply_icon_sizes()
@@ -270,6 +306,8 @@ class ResponsePanel(QFrame):
         content = response.text or response.html
         if response.is_image_response:
             return ResponsePanel._image_html(content)
+        if response.is_downloadable and ResponsePanel._is_generated_document_content(response.intent_content_type):
+            return ResponsePanel._generated_document_html(response.intent_content_type)
         if response.text.strip():
             return ResponsePanel._markdown_to_html(response.text)
         if response.html and response.html.strip().startswith("<"):
@@ -290,6 +328,17 @@ class ResponsePanel(QFrame):
             '<div class="image-response">'
             f'<img src="{image_src}" alt="EdTalkies image response">'
             '<p class="image-hint">Use the download icon below to save this image.</p>'
+            "</div>"
+        )
+
+    @staticmethod
+    def _generated_document_html(content_type: str) -> str:
+        label = ResponsePanel._normalize_content_type(content_type).title() or "Document"
+        return (
+            '<div class="generated-document-response">'
+            f"<h2>{ResponsePanel._escape(label)} is ready</h2>"
+            "<p>Use the Open icon below to open the generated document, "
+            "or use the format icon to download it.</p>"
             "</div>"
         )
 
@@ -418,6 +467,9 @@ class ResponsePanel(QFrame):
     .image-response {{ text-align: center; margin: 10px 0 18px; }}
     .image-response img {{ width: 80%; max-width: 100%; height: auto; border-radius: 10px; }}
     .image-hint {{ color: {EdTalkiesTheme.TEXT_SOFT}; font-size: 14px; font-style: italic; }}
+    .generated-document-response {{ background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px; padding: 18px; text-align: center; }}
+    .generated-document-response h2 {{ margin-top: 0; }}
+    .generated-document-response p {{ color: {EdTalkiesTheme.TEXT_MUTED}; }}
     table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
     th, td {{ border: 1px solid rgba(255, 255, 255, 0.22); padding: 8px 10px; text-align: left; }}
     th {{ background: rgba(255, 255, 255, 0.10); }}
